@@ -271,8 +271,11 @@ void SegmentSearch::PrintSegments() {
     printf("  Диапазон: %.2f%% -> %.2f%%\n", seg.startPercent, seg.endPercent);
     printf("  Направление: %s\n", seg.direction == DIRECTION_UP ? "ВВЕРХ ↑" : "ВНИЗ ↓");
     printf("  Статус: %s\n", seg.active ? "Активен" : "Завершен");
-    printf("  Начало: %s\n", seg.rangeStart.GetBase16().c_str());
-    printf("  Конец:  %s\n", seg.rangeEnd.GetBase16().c_str());
+    Int tmp1, tmp2;
+    tmp1.Set((Int*)&seg.rangeStart);
+    tmp2.Set((Int*)&seg.rangeEnd);
+    printf("  Начало: %s\n", tmp1.GetBase16().c_str());
+    printf("  Конец:  %s\n", tmp2.GetBase16().c_str());
     printf("\n");
   }
   
