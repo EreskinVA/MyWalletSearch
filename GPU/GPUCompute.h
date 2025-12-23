@@ -81,7 +81,14 @@ __device__ __noinline__ void CheckPoint(uint32_t *_h, int32_t incr, int32_t endo
       pos = atomicAdd(out, 1);
       if (pos < maxFound) {
         out[pos*ITEM_SIZE32 + 1] = tid;
-        out[pos*ITEM_SIZE32 + 2] = (uint32_t)(incr << 16) | (uint32_t)(mode << 15) | (uint32_t)(endo);
+        // Pack metadata:
+        // - high 16 bits: incr (signed 16-bit)
+        // - bit 15 (low half): mode
+        // - low 15 bits: endo
+        // NOTE: shifting a negative signed value is UB in C/C++, so we cast through uint16_t.
+        out[pos*ITEM_SIZE32 + 2] = (((uint32_t)(uint16_t)incr) << 16) |
+                                   ((uint32_t)(mode) << 15) |
+                                   (uint32_t)(endo);
         out[pos*ITEM_SIZE32 + 3] = _h[0];
         out[pos*ITEM_SIZE32 + 4] = _h[1];
         out[pos*ITEM_SIZE32 + 5] = _h[2];
