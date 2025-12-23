@@ -101,9 +101,22 @@ x64\Release\VanitySearch.exe -seg segments_54-62_GTX1050Ti.txt -bits 71 -kangaro
 
 ---
 
+## ✅ ИСПРАВЛЕНО В КОДЕ
+
+Все ошибки компиляции исправлены:
+- ✅ Добавлены определения `addcarry_u64_u64p` и `subborrow_u64_u64p` для Windows/MSVC
+- ✅ Исправлена проблема с `M_PI` (добавлен `#define _USE_MATH_DEFINES`)
+- ✅ Исправлено форматирование `printf` для Windows
+- ✅ Удалено дублирование функции `PrintARMCapabilities`
+
+**Просто перекомпилируйте проект!**
+
+---
+
 ## ❓ ЕСЛИ НИЧЕГО НЕ ПОМОГЛО
 
 1. Убедитесь, что установлен **"Desktop development with C++"** в Visual Studio Installer
 2. Убедитесь, что установлен **CUDA Toolkit** (если используете GPU)
 3. Попробуйте открыть проект заново: **File → Close Solution**, затем открыть `VanitySearch.sln` снова
+4. Убедитесь, что используете **Visual Studio 2019 или новее** (для поддержки C++17)
 

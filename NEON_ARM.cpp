@@ -212,12 +212,5 @@ void NEONBatchProcessor::PrintStats() const {
     printf("=======================\n");
 }
 
-#else
-// Заглушки для не-ARM архитектур
-
-void PrintARMCapabilities() {
-    printf("[NEON] Не доступен (не ARM архитектура)\n");
-}
-
 #endif // __aarch64__
 

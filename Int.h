@@ -341,9 +341,45 @@ static inline unsigned char subborrow_u64_u64p(unsigned char c, uint64_t a, uint
 
 #else
 
+// Windows/MSVC
 #include <intrin.h>
 #define TZC(x) _tzcnt_u64(x)
 #define LZC(x) _lzcnt_u64(x)
+
+// MSVC has _addcarry_u64 and _subborrow_u64 intrinsics
+// Wrap them to match the interface used in the code
+static inline unsigned char addcarry_u64_u64p(unsigned char c, uint64_t a, uint64_t b, uint64_t *out) {
+  return _addcarry_u64(c,
+                       (unsigned long long)a,
+                       (unsigned long long)b,
+                       (unsigned long long *)out);
+}
+
+static inline unsigned char subborrow_u64_u64p(unsigned char c, uint64_t a, uint64_t b, uint64_t *out) {
+  return _subborrow_u64(c,
+                        (unsigned long long)a,
+                        (unsigned long long)b,
+                        (unsigned long long *)out);
+}
+
+// MSVC has _umul128 built-in
+// _umul128 is already available in <intrin.h>
+
+// MSVC has _mul128 built-in
+// _mul128 is already available in <intrin.h>
+
+// MSVC has _udiv128 built-in (available in newer versions)
+#ifndef _udiv128
+static uint64_t inline _udiv128(uint64_t hi, uint64_t lo, uint64_t d, uint64_t *r) {
+  unsigned __int128 n = ((unsigned __int128)hi << 64) | (unsigned __int128)lo;
+  uint64_t q = (uint64_t)(n / (unsigned __int128)d);
+  *r = (uint64_t)(n % (unsigned __int128)d);
+  return q;
+}
+#endif
+
+#define __shiftright128(a,b,n) ((a)>>(n))|((b)<<(64-(n)))
+#define __shiftleft128(a,b,n) ((b)<<(n))|((a)>>(64-(n)))
 
 #endif
 
