@@ -9,12 +9,29 @@ cd %USERPROFILE%\Documents
 git clone https://github.com/EreskinVA/MyWalletSearch.git
 cd MyWalletSearch
 
-# ШАГ 2: Компиляция в Visual Studio
-# ----------------------------------
+# ШАГ 2: Компиляция (выберите один способ)
+# -----------------------------------------
+
+# СПОСОБ A: Через batch-файл (РЕКОМЕНДУЕТСЯ - обходит ошибки IDE)
+# -----------------------------------------------------------------
+build_windows.bat
+
+# СПОСОБ B: Через Developer Command Prompt
+# ------------------------------------------
+# 1. Win + S → "Developer Command Prompt"
+# 2. Выберите "Developer Command Prompt for VS 2022"
+# 3. Выполните:
+#    cd C:\Users\User\Desktop\vanity\projectCode\MyWalletSearch
+#    msbuild VanitySearch.sln /p:Configuration=Release /p:Platform=x64 /t:Rebuild
+
+# СПОСОБ C: Через Visual Studio IDE
+# -----------------------------------
 # 1. Двойной клик на VanitySearch.sln
 # 2. Вверху: Release + x64
 # 3. Build → Rebuild Solution
-# 4. Ждём: "Build succeeded"
+# 4. Если видите ошибку "Designtime build" - ИГНОРИРУЙТЕ её!
+#    (Это не критично, см. WINDOWS_ИСПРАВЛЕНИЕ_ОШИБКИ.md)
+# 5. Ждём: "Build succeeded"
 
 # ШАГ 3: Проверка GPU
 # --------------------

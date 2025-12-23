@@ -35,6 +35,14 @@
     <ClInclude Include="Timer.h" />
     <ClInclude Include="Vanity.h" />
     <ClInclude Include="Wildcard.h" />
+    <ClInclude Include="SegmentSearch.h" />
+    <ClInclude Include="ProgressManager.h" />
+    <ClInclude Include="LoadBalancer.h" />
+    <ClInclude Include="AdaptivePriority.h" />
+    <ClInclude Include="KangarooSearch.h" />
+    <ClInclude Include="AVX512.h" />
+    <ClInclude Include="AVX512BatchProcessor.h" />
+    <ClInclude Include="NEON_ARM.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Base58.cpp" />
@@ -56,6 +64,14 @@
     <ClCompile Include="SECP256K1.cpp" />
     <ClCompile Include="Timer.cpp" />
     <ClCompile Include="Vanity.cpp" />
+    <ClCompile Include="SegmentSearch.cpp" />
+    <ClCompile Include="ProgressManager.cpp" />
+    <ClCompile Include="LoadBalancer.cpp" />
+    <ClCompile Include="AdaptivePriority.cpp" />
+    <ClCompile Include="KangarooSearch.cpp" />
+    <ClCompile Include="AVX512.cpp" />
+    <ClCompile Include="AVX512BatchProcessor.cpp" />
+    <ClCompile Include="NEON_ARM.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="GPU\GPUEngine.cu">
@@ -79,25 +95,27 @@
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>MultiByte</CharacterSet>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseSM30|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
-    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 11.1.props" />
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.0.props" Condition="Exists('$(VCTargetsPath)\BuildCustomizations\CUDA 12.0.props')" />
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 11.8.props" Condition="!Exists('$(VCTargetsPath)\BuildCustomizations\CUDA 12.0.props') AND Exists('$(VCTargetsPath)\BuildCustomizations\CUDA 11.8.props')" />
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 11.1.props" Condition="!Exists('$(VCTargetsPath)\BuildCustomizations\CUDA 12.0.props') AND !Exists('$(VCTargetsPath)\BuildCustomizations\CUDA 11.8.props') AND Exists('$(VCTargetsPath)\BuildCustomizations\CUDA 11.1.props')" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -168,6 +186,8 @@
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
-    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 11.1.targets" />
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.0.targets" Condition="Exists('$(VCTargetsPath)\BuildCustomizations\CUDA 12.0.targets')" />
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 11.8.targets" Condition="!Exists('$(VCTargetsPath)\BuildCustomizations\CUDA 12.0.targets') AND Exists('$(VCTargetsPath)\BuildCustomizations\CUDA 11.8.targets')" />
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 11.1.targets" Condition="!Exists('$(VCTargetsPath)\BuildCustomizations\CUDA 12.0.targets') AND !Exists('$(VCTargetsPath)\BuildCustomizations\CUDA 11.8.targets') AND Exists('$(VCTargetsPath)\BuildCustomizations\CUDA 11.1.targets')" />
   </ImportGroup>
 </Project>
