@@ -170,7 +170,7 @@ public:
   // To String
   std::string GetBase2();
   std::string GetBase10();
-  std::string GetBase16();
+  std::string GetBase16() const;
   std::string GetBaseN(int n,char *charset);
   std::string GetBlockStr();
   std::string GetC64Str(int nbDigit);
