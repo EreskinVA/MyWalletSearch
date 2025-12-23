@@ -36,10 +36,14 @@
 #endif
 
 // Standard C++ headers
+#ifdef _WIN32
+#define _USE_MATH_DEFINES  // Enable M_PI, M_E, etc. in <cmath> for MSVC
+#endif
 #include <cstdint>
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <cmath>  // Include <cmath> here so M_PI is available everywhere
 
 #endif // STDAFX_H
 

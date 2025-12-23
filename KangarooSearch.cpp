@@ -5,9 +5,6 @@
 
 #include "stdafx.h"
 
-#ifdef _WIN32
-#define _USE_MATH_DEFINES
-#endif
 #include "KangarooSearch.h"
 #include "hash/sha256.h"
 #include <cmath>
