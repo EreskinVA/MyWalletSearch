@@ -105,11 +105,20 @@ x64\Release\VanitySearch.exe -seg segments_54-62_GTX1050Ti.txt -bits 71 -kangaro
 
 Все ошибки компиляции исправлены:
 - ✅ Добавлены определения `addcarry_u64_u64p` и `subborrow_u64_u64p` для Windows/MSVC
-- ✅ Исправлена проблема с `M_PI` (добавлен `#define _USE_MATH_DEFINES`)
+- ✅ Исправлена проблема с `M_PI` (добавлен `#define _USE_MATH_DEFINES` в заголовочных файлах)
 - ✅ Исправлено форматирование `printf` для Windows
 - ✅ Удалено дублирование функции `PrintARMCapabilities`
+- ✅ Убрано переопределение `_udiv128` (используется встроенная функция MSVC)
 
 **Просто перекомпилируйте проект!**
+
+### ⚠️ ВАЖНО: Требования к версии Visual Studio
+
+Для работы `_udiv128` требуется **Visual Studio 2019 версии 16.8 или новее**.
+
+Если у вас более старая версия:
+1. Обновите Visual Studio до версии 2019 16.8+ или 2022
+2. Или используйте компиляцию через WSL (Windows Subsystem for Linux) с GCC
 
 ---
 

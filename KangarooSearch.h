@@ -7,6 +7,10 @@
 #ifndef KANGAROOSEARCHH
 #define KANGAROOSEARCHH
 
+#ifdef _WIN32
+#define _USE_MATH_DEFINES
+#endif
+
 #include "Int.h"
 #include "Point.h"
 #include "SECP256k1.h"

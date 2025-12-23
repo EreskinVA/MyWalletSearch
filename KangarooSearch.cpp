@@ -3,11 +3,11 @@
  * Based on "Monte Carlo Methods for Index Computation (mod p)" by J.M. Pollard
  */
 
-#include "KangarooSearch.h"
-#include "hash/sha256.h"
 #ifdef _WIN32
 #define _USE_MATH_DEFINES
 #endif
+#include "KangarooSearch.h"
+#include "hash/sha256.h"
 #include <cmath>
 #include <ctime>
 #include <fstream>
