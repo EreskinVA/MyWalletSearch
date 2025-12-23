@@ -339,15 +339,15 @@ static void inline imm_mul(uint64_t *x, uint64_t y, uint64_t *dst,uint64_t *carr
   unsigned char c = 0;
   uint64_t h, carry;
   dst[0] = _umul128(x[0], y, &h); carry = h;
-  c = _addcarry_u64(c, _umul128(x[1], y, &h), carry, dst + 1); carry = h;
-  c = _addcarry_u64(c, _umul128(x[2], y, &h), carry, dst + 2); carry = h;
-  c = _addcarry_u64(c, _umul128(x[3], y, &h), carry, dst + 3); carry = h;
-  c = _addcarry_u64(c, _umul128(x[4], y, &h), carry, dst + 4); carry = h;
+  c = _addcarry_u64(c, _umul128(x[1], y, &h), carry, (unsigned long long *)(dst + 1)); carry = h;
+  c = _addcarry_u64(c, _umul128(x[2], y, &h), carry, (unsigned long long *)(dst + 2)); carry = h;
+  c = _addcarry_u64(c, _umul128(x[3], y, &h), carry, (unsigned long long *)(dst + 3)); carry = h;
+  c = _addcarry_u64(c, _umul128(x[4], y, &h), carry, (unsigned long long *)(dst + 4)); carry = h;
 #if NB64BLOCK > 5
-  c = _addcarry_u64(c, _umul128(x[5], y, &h), carry, dst + 5); carry = h;
-  c = _addcarry_u64(c, _umul128(x[6], y, &h), carry, dst + 6); carry = h;
-  c = _addcarry_u64(c, _umul128(x[7], y, &h), carry, dst + 7); carry = h;
-  c = _addcarry_u64(c, _umul128(x[8], y, &h), carry, dst + 8); carry = h;
+  c = _addcarry_u64(c, _umul128(x[5], y, &h), carry, (unsigned long long *)(dst + 5)); carry = h;
+  c = _addcarry_u64(c, _umul128(x[6], y, &h), carry, (unsigned long long *)(dst + 6)); carry = h;
+  c = _addcarry_u64(c, _umul128(x[7], y, &h), carry, (unsigned long long *)(dst + 7)); carry = h;
+  c = _addcarry_u64(c, _umul128(x[8], y, &h), carry, (unsigned long long *)(dst + 8)); carry = h;
 #endif
   *carryH = carry;
 
@@ -358,16 +358,16 @@ static void inline imm_imul(uint64_t* x,uint64_t y,uint64_t* dst,uint64_t* carry
   unsigned char c = 0;
   uint64_t h,carry;
   dst[0] = _umul128(x[0],y,&h); carry = h;
-  c = _addcarry_u64(c,_umul128(x[1],y,&h),carry,dst + 1); carry = h;
-  c = _addcarry_u64(c,_umul128(x[2],y,&h),carry,dst + 2); carry = h;
-  c = _addcarry_u64(c,_umul128(x[3],y,&h),carry,dst + 3); carry = h;
+  c = _addcarry_u64(c,_umul128(x[1],y,&h),carry,(unsigned long long *)(dst + 1)); carry = h;
+  c = _addcarry_u64(c,_umul128(x[2],y,&h),carry,(unsigned long long *)(dst + 2)); carry = h;
+  c = _addcarry_u64(c,_umul128(x[3],y,&h),carry,(unsigned long long *)(dst + 3)); carry = h;
 #if NB64BLOCK > 5
-  c = _addcarry_u64(c,_umul128(x[4],y,&h),carry,dst + 4); carry = h;
-  c = _addcarry_u64(c,_umul128(x[5],y,&h),carry,dst + 5); carry = h;
-  c = _addcarry_u64(c,_umul128(x[6],y,&h),carry,dst + 6); carry = h;
-  c = _addcarry_u64(c,_umul128(x[7],y,&h),carry,dst + 7); carry = h;
+  c = _addcarry_u64(c,_umul128(x[4],y,&h),carry,(unsigned long long *)(dst + 4)); carry = h;
+  c = _addcarry_u64(c,_umul128(x[5],y,&h),carry,(unsigned long long *)(dst + 5)); carry = h;
+  c = _addcarry_u64(c,_umul128(x[6],y,&h),carry,(unsigned long long *)(dst + 6)); carry = h;
+  c = _addcarry_u64(c,_umul128(x[7],y,&h),carry,(unsigned long long *)(dst + 7)); carry = h;
 #endif
-  c = _addcarry_u64(c,_mul128(x[NB64BLOCK - 1],y,(int64_t*)&h),carry,dst + NB64BLOCK - 1); carry = h;
+  c = _addcarry_u64(c,_mul128(x[NB64BLOCK - 1],y,(int64_t*)&h),carry,(unsigned long long *)(dst + NB64BLOCK - 1)); carry = h;
   * carryH = carry;
 
 }
@@ -378,16 +378,16 @@ static void inline imm_umul(uint64_t *x, uint64_t y, uint64_t *dst) {
   unsigned char c = 0;
   uint64_t h, carry;
   dst[0] = _umul128(x[0], y, &h); carry = h;
-  c = _addcarry_u64(c, _umul128(x[1], y, &h), carry, dst + 1); carry = h;
-  c = _addcarry_u64(c, _umul128(x[2], y, &h), carry, dst + 2); carry = h;
-  c = _addcarry_u64(c, _umul128(x[3], y, &h), carry, dst + 3); carry = h;
+  c = _addcarry_u64(c, _umul128(x[1], y, &h), carry, (unsigned long long *)(dst + 1)); carry = h;
+  c = _addcarry_u64(c, _umul128(x[2], y, &h), carry, (unsigned long long *)(dst + 2)); carry = h;
+  c = _addcarry_u64(c, _umul128(x[3], y, &h), carry, (unsigned long long *)(dst + 3)); carry = h;
 #if NB64BLOCK > 5
-  c = _addcarry_u64(c, _umul128(x[4], y, &h), carry, dst + 4); carry = h;
-  c = _addcarry_u64(c, _umul128(x[5], y, &h), carry, dst + 5); carry = h;
-  c = _addcarry_u64(c, _umul128(x[6], y, &h), carry, dst + 6); carry = h;
-  c = _addcarry_u64(c, _umul128(x[7], y, &h), carry, dst + 7); carry = h;
+  c = _addcarry_u64(c, _umul128(x[4], y, &h), carry, (unsigned long long *)(dst + 4)); carry = h;
+  c = _addcarry_u64(c, _umul128(x[5], y, &h), carry, (unsigned long long *)(dst + 5)); carry = h;
+  c = _addcarry_u64(c, _umul128(x[6], y, &h), carry, (unsigned long long *)(dst + 6)); carry = h;
+  c = _addcarry_u64(c, _umul128(x[7], y, &h), carry, (unsigned long long *)(dst + 7)); carry = h;
 #endif
-  _addcarry_u64(c, 0ULL, carry, dst + (NB64BLOCK - 1));
+  _addcarry_u64(c, 0ULL, carry, (unsigned long long *)(dst + (NB64BLOCK - 1)));
 
 }
 
