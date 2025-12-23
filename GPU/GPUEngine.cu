@@ -156,6 +156,7 @@ int _ConvertSMVer2Cores(int major, int minor) {
       {0x75,  64},
       {0x80,  64},
       {0x86, 128},
+      {0x89, 128}, // Ada Lovelace (SM 8.9) AD10x (e.g. RTX 4090)
       {-1, -1} };
 
   int index = 0;
