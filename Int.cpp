@@ -865,8 +865,8 @@ void Int::Mult(Int *a,Int *b) {
   for (int i = 1; i < NB64BLOCK; i++) {
     for (int j = 0; j <= i; j++) {
       c = _addcarry_u64(c, _umul128(a->bits64[j], b->bits64[i - j], &h), pr, &pr);
-      c = _addcarry_u64(c, carryl, h, &carryl);
-      c = _addcarry_u64(c, carryh, 0, &carryh);
+      c = _addcarry_u64(c, carryl, h, (unsigned long long *)&carryl);
+      c = _addcarry_u64(c, carryh, 0, (unsigned long long *)&carryh);
     }
     bits64[i] = pr;
     pr = carryl;
