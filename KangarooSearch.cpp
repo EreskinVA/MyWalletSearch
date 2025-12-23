@@ -249,16 +249,21 @@ bool KangarooSearch::CheckCollision(const DistinguishedPoint &dp, Int &privateKe
 
 Int KangarooSearch::ReconstructPrivateKey(const DistinguishedPoint &tameDP,
                                            const DistinguishedPoint &wildDP) {
-  // Private key = rangeStart + tameDistance - wildDistance
-  // Потому что: (rangeStart + tame) * G = (target - wild) * G
-  // => target = rangeStart + tame + wild
+  // Математика Pollard's Kangaroo:
+  // Tame: P_tame = (rangeStart + d_tame) * G
+  // Wild: P_wild = TargetPubKey - d_wild * G = k * G - d_wild * G
+  //
+  // При коллизии: P_tame = P_wild
+  // (rangeStart + d_tame) * G = (k - d_wild) * G
+  // rangeStart + d_tame = k - d_wild
+  // k = rangeStart + d_tame + d_wild
   
   Int privateKey;
   privateKey.Set(&rangeStart);
   privateKey.Add(&tameDP.distance);
   privateKey.Add(&wildDP.distance);
   
-  // Модуль по order кривой
+  // Модуль по order кривой для корректности
   privateKey.Mod(&secp->order);
   
   return privateKey;

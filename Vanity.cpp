@@ -1522,6 +1522,11 @@ void VanitySearch::FindKeyCPU(TH_PARAM *ph) {
 
     key.Add((uint64_t)CPU_GRP_SIZE);
     counters[thId]+= 6*CPU_GRP_SIZE; // Point + endo #1 + endo #2 + Symetric point + endo #1 + endo #2
+    
+    // Update segment search progress
+    if (useSegmentSearch && segmentSearch != NULL) {
+      segmentSearch->UpdateProgress(thId, 6*CPU_GRP_SIZE);
+    }
 
   }
 
@@ -1534,7 +1539,13 @@ void VanitySearch::FindKeyCPU(TH_PARAM *ph) {
 void VanitySearch::getGPUStartingKeys(int thId, int groupSize, int nbThread, Int *keys, Point *p) {
 
   for (int i = 0; i < nbThread; i++) {
-    if (rekey > 0) {
+    // Use segment search if enabled (GPU integration)
+    if (useSegmentSearch && segmentSearch != NULL) {
+      if (!segmentSearch->GetStartingKey(thId * nbThread + i, keys[i])) {
+        // Fallback to standard method if segment search fails
+        keys[i].Rand(256);
+      }
+    } else if (rekey > 0) {
       keys[i].Rand(256);
     } else {
       keys[i].Set(&startKey);
@@ -1616,6 +1627,11 @@ void VanitySearch::FindKeyGPU(TH_PARAM *ph) {
         keys[i].Add((uint64_t)STEP_SIZE);
       }
       counters[thId] += 6ULL * STEP_SIZE * nbThread; // Point +  endo1 + endo2 + symetrics
+      
+      // Update progress for GPU thread (if enabled)
+      if (useSegmentSearch && segmentSearch != NULL) {
+        segmentSearch->UpdateProgress(thId, 6ULL * STEP_SIZE * nbThread);
+      }
     }
 
   }
@@ -1802,6 +1818,14 @@ void VanitySearch::Search(int nbThread,std::vector<int> gpuId,std::vector<int> g
       printf("\r[%.2f Mkey/s][GPU %.2f Mkey/s][Total 2^%.2f]%s[Found %d]  ",
         avgKeyRate / 1000000.0, avgGpuKeyRate / 1000000.0,
           log2((double)count), GetExpectedTime(avgKeyRate, (double)count).c_str(),nbFoundKey);
+      
+      // Segment search progress info
+      if (useSegmentSearch && segmentSearch != NULL) {
+        int activeSegs = segmentSearch->GetActiveSegmentCount();
+        if (activeSegs > 0) {
+          printf("[Segments: %d active]", activeSegs);
+        }
+      }
     }
 
     if (rekey > 0) {
@@ -1810,6 +1834,11 @@ void VanitySearch::Search(int nbThread,std::vector<int> gpuId,std::vector<int> g
         rekeyRequest(params);
         lastRekey = count;
       }
+    }
+    
+    // Perform load balancing if enabled
+    if (useSegmentSearch && segmentSearch != NULL) {
+      segmentSearch->PerformRebalance();
     }
 
     lastCount = count;
