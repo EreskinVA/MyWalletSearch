@@ -277,22 +277,30 @@ GPUEngine::GPUEngine(int nbThreadGroup, int nbThreadPerGroup, int gpuId, uint32_
     // Non-fatal: keep default cache config
   }
 
-  // Some environments/drivers enforce strict limits; treat as non-fatal and fallback.
-  // We do set it because some device functions use non-trivial stack, but we'll degrade gracefully.
-  size_t stackCandidates[] = {49152, 32768, 16384, 8192, 4096};
+  // IMPORTANT: kernels in this project use large per-thread local arrays (e.g. dx[513][4] in GPUCompute),
+  // so running with a too-small device stack produces silent wrong results (and CPU/GPU check mismatches).
+  // We therefore require a minimum stack limit; if the driver refuses it (often due to memory pressure),
+  // we fail early and ask the user to lower grid size (-g) to reduce total stack allocation.
+  const size_t minRequiredStack = 20480; // conservative minimum for correctness (>= ~16KB local arrays + overhead)
+  size_t stackCandidates[] = {49152, 32768, 24576, 20480};
   bool stackOk = false;
+  size_t selectedStack = 0;
   for (size_t k = 0; k < sizeof(stackCandidates) / sizeof(stackCandidates[0]); k++) {
     size_t stackSize = stackCandidates[k];
     err = cudaDeviceSetLimit(cudaLimitStackSize, stackSize);
     if (err == cudaSuccess) {
       stackOk = true;
+      selectedStack = stackSize;
       break;
     }
     printf("GPUEngine: cudaDeviceSetLimit(stack=%zu) failed: %s\n", stackSize, cudaGetErrorString(err));
   }
   if (!stackOk) {
-    printf("GPUEngine: Warning: unable to set cudaLimitStackSize, continuing with default\n");
+    printf("GPUEngine: ERROR: unable to set cudaLimitStackSize >= %zu bytes.\n", minRequiredStack);
+    printf("GPUEngine: Hint: reduce grid size (-g) to reduce total stack allocation.\n");
+    return;
   }
+  printf("GPUEngine: cudaLimitStackSize set to %zu bytes\n", selectedStack);
 
   /*
   size_t heapSize = ;
