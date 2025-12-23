@@ -1,0 +1,43 @@
+# Агрессивная конфигурация для 14x RTX 4090
+# ПОЛНОЕ покрытие диапазона если FOCUSED и BALANCED не сработали
+# Используйте как последнюю попытку
+
+# === НИЖНЯЯ ПОЛОВИНА (0-48%, НЕ покрыто в FOCUSED) ===
+
+# Очень низкие зоны
+0.0 10.0 up aggressive_ultra_low
+10.0 20.0 up aggressive_very_low
+20.0 30.0 up aggressive_low
+30.0 40.0 up aggressive_lower_mid
+
+# Ближе к проверенной зоне
+40.0 45.0 up aggressive_pre_focus
+45.0 48.0 up aggressive_near_focus
+
+# === ВЕРХНЯЯ ПОЛОВИНА (56-100%, НЕ покрыто в FOCUSED) ===
+
+# От проверенной зоны выше
+56.0 60.0 up aggressive_post_focus
+60.0 65.0 up aggressive_upper_mid
+
+# Высокие зоны
+65.0 70.0 up aggressive_high
+70.0 75.0 up aggressive_very_high
+75.0 85.0 up aggressive_ultra_high
+
+# === ЭКСТРЕМАЛЬНЫЕ ЗОНЫ (маловероятно, но проверим) ===
+
+# Самый верх диапазона
+85.0 95.0 up aggressive_extreme_high
+
+# Верхушка (если создатель выбрал максимум)
+95.0 100.0 up aggressive_maximum
+
+# Совсем низ (если выбрал минимум)
+0.0 5.0 down aggressive_minimum_rev
+
+# ИТОГО: 14 сегментов
+# Покрытие: ВСЁ кроме уже проверенного в FOCUSED (48-56%)
+# Используйте только если первые два раунда не дали результата
+# С 14x RTX 4090 это займёт ~3-5 дней
+

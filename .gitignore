@@ -1,16 +1,45 @@
-DOC/
-.vs/
-VanitySearchNoCUDA.*
-VanitySearch.vcxproj.user
-VanitySearchCUDA8.vcxproj.user
-VanitySearchCUDA8.vcxproj.user
-VanitySearchCUDA8.VC.opendb
-VanitySearchCUDA8.sdf
-vc140.pdb
-x64/
-obj/
-.idea/
-CMakeLists.txt
+# Build artifacts
 VanitySearch
-cmake-build-debug/
-*.prf
+VanitySearch-*
+*.o
+*.exe
+obj/
+*.dat
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Temporary files
+test_*.txt
+bench.txt
+temp_*.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Progress files (содержат приватные данные!)
+*progress*.dat
+search*.dat
+kangaroo*.dat
+
+# Results (содержат приватные ключи!)
+*SOLUTION*.txt
+*FOUND*.txt
+*JACKPOT*.txt
+results*.txt
+RESULTS*.txt
+
+# Large test files
+*.bin
+*.dump
