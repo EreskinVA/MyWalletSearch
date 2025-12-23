@@ -19,6 +19,7 @@
 #define RIPEMD160_H
 
 #include <stdint.h>
+#include <cstdint>
 #include <stdlib.h>
 #include <string>
 
