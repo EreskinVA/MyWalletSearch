@@ -38,6 +38,43 @@
 
 // ---------------------------------------------------------------------------------------
 
+static void *AllocHostBuffer(size_t size, unsigned int hostAllocFlags, bool *isCudaPinned) {
+
+  if (isCudaPinned) *isCudaPinned = false;
+
+  void *p = NULL;
+  cudaError_t err = cudaHostAlloc(&p, size, hostAllocFlags);
+  if (err == cudaSuccess) {
+    if (isCudaPinned) *isCudaPinned = true;
+    return p;
+  }
+
+  // Try a simpler pinned allocation (no flags)
+  err = cudaMallocHost(&p, size);
+  if (err == cudaSuccess) {
+    if (isCudaPinned) *isCudaPinned = true;
+    return p;
+  }
+
+  // Fallback to pageable host memory (slower transfers but works under pinned limits)
+  p = malloc(size);
+  if (!p) {
+    printf("GPUEngine: Host allocation failed (size=%zu bytes)\n", size);
+    return NULL;
+  }
+
+  return p;
+}
+
+static void FreeHostBuffer(void *p, bool isCudaPinned) {
+  if (!p) return;
+  if (isCudaPinned) {
+    cudaFreeHost(p);
+  } else {
+    free(p);
+  }
+}
+
 __global__ void comp_keys(uint32_t mode,prefix_t *prefix, uint32_t *lookup32, uint64_t *keys, uint32_t maxFound, uint32_t *found) {
 
   int xPtr = (blockIdx.x*blockDim.x) * 8;
@@ -210,6 +247,10 @@ GPUEngine::GPUEngine(int nbThreadGroup, int nbThreadPerGroup, int gpuId, uint32_
   this->nbThread = nbThreadGroup * nbThreadPerGroup;
   this->maxFound = maxFound;
   this->outputSize = (maxFound*ITEM_SIZE + 4);
+  inputPrefixPinnedCuda = false;
+  inputPrefixLookUpPinnedCuda = false;
+  inputKeyPinnedCuda = false;
+  outputPrefixPinnedCuda = false;
 
   char tmp[512];
   sprintf(tmp,"GPU #%d %s (%dx%d cores) Grid(%dx%d)",
@@ -254,9 +295,9 @@ GPUEngine::GPUEngine(int nbThreadGroup, int nbThreadPerGroup, int gpuId, uint32_
     printf("GPUEngine: Allocate prefix memory: %s\n", cudaGetErrorString(err));
     return;
   }
-  err = cudaHostAlloc(&inputPrefixPinned, _64K * 2, cudaHostAllocWriteCombined | cudaHostAllocMapped);
-  if (err != cudaSuccess) {
-    printf("GPUEngine: Allocate prefix pinned memory: %s\n", cudaGetErrorString(err));
+  inputPrefixPinned = (prefix_t *)AllocHostBuffer(_64K * 2, cudaHostAllocWriteCombined | cudaHostAllocMapped, &inputPrefixPinnedCuda);
+  if (!inputPrefixPinned) {
+    printf("GPUEngine: Allocate prefix host memory failed\n");
     return;
   }
   err = cudaMalloc((void **)&inputKey, nbThread * 32 * 2);
@@ -264,9 +305,9 @@ GPUEngine::GPUEngine(int nbThreadGroup, int nbThreadPerGroup, int gpuId, uint32_
     printf("GPUEngine: Allocate input memory: %s\n", cudaGetErrorString(err));
     return;
   }
-  err = cudaHostAlloc(&inputKeyPinned, nbThread * 32 * 2, cudaHostAllocWriteCombined | cudaHostAllocMapped);
-  if (err != cudaSuccess) {
-    printf("GPUEngine: Allocate input pinned memory: %s\n", cudaGetErrorString(err));
+  inputKeyPinned = (uint64_t *)AllocHostBuffer(nbThread * 32 * 2, cudaHostAllocWriteCombined | cudaHostAllocMapped, &inputKeyPinnedCuda);
+  if (!inputKeyPinned) {
+    printf("GPUEngine: Allocate input host memory failed\n");
     return;
   }
   err = cudaMalloc((void **)&outputPrefix, outputSize);
@@ -274,9 +315,9 @@ GPUEngine::GPUEngine(int nbThreadGroup, int nbThreadPerGroup, int gpuId, uint32_
     printf("GPUEngine: Allocate output memory: %s\n", cudaGetErrorString(err));
     return;
   }
-  err = cudaHostAlloc(&outputPrefixPinned, outputSize, cudaHostAllocMapped);
-  if (err != cudaSuccess) {
-    printf("GPUEngine: Allocate output pinned memory: %s\n", cudaGetErrorString(err));
+  outputPrefixPinned = (uint32_t *)AllocHostBuffer(outputSize, cudaHostAllocMapped, &outputPrefixPinnedCuda);
+  if (!outputPrefixPinned) {
+    printf("GPUEngine: Allocate output host memory failed\n");
     return;
   }
 
@@ -345,7 +386,10 @@ GPUEngine::~GPUEngine() {
   cudaFree(inputKey);
   cudaFree(inputPrefix);
   if(inputPrefixLookUp) cudaFree(inputPrefixLookUp);
-  cudaFreeHost(outputPrefixPinned);
+  FreeHostBuffer(outputPrefixPinned, outputPrefixPinnedCuda);
+  FreeHostBuffer(inputPrefixPinned, inputPrefixPinnedCuda);
+  FreeHostBuffer(inputPrefixLookUpPinned, inputPrefixLookUpPinnedCuda);
+  FreeHostBuffer(inputKeyPinned, inputKeyPinnedCuda);
   cudaFree(outputPrefix);
 
 }
@@ -372,7 +416,7 @@ void GPUEngine::SetPrefix(std::vector<prefix_t> prefixes) {
   cudaMemcpy(inputPrefix, inputPrefixPinned, _64K * 2, cudaMemcpyHostToDevice);
 
   // We do not need the input pinned memory anymore
-  cudaFreeHost(inputPrefixPinned);
+  FreeHostBuffer(inputPrefixPinned, inputPrefixPinnedCuda);
   inputPrefixPinned = NULL;
   lostWarning = false;
 
@@ -391,7 +435,7 @@ void GPUEngine::SetPattern(const char *pattern) {
   cudaMemcpy(inputPrefix, inputPrefixPinned, _64K * 2, cudaMemcpyHostToDevice);
 
   // We do not need the input pinned memory anymore
-  cudaFreeHost(inputPrefixPinned);
+  FreeHostBuffer(inputPrefixPinned, inputPrefixPinnedCuda);
   inputPrefixPinned = NULL;
   lostWarning = false;
 
@@ -414,7 +458,13 @@ void GPUEngine::SetPrefix(std::vector<LPREFIX> prefixes, uint32_t totalPrefix) {
   }
   err = cudaHostAlloc(&inputPrefixLookUpPinned, (_64K+totalPrefix) * 4, cudaHostAllocWriteCombined | cudaHostAllocMapped);
   if (err != cudaSuccess) {
-    printf("GPUEngine: Allocate prefix lookup pinned memory: %s\n", cudaGetErrorString(err));
+    // Fallback: try to allocate pinned/non-pinned host buffer manually
+    inputPrefixLookUpPinned = (uint32_t *)AllocHostBuffer((_64K + totalPrefix) * 4, cudaHostAllocWriteCombined | cudaHostAllocMapped, &inputPrefixLookUpPinnedCuda);
+  } else {
+    inputPrefixLookUpPinnedCuda = true;
+  }
+  if (!inputPrefixLookUpPinned) {
+    printf("GPUEngine: Allocate prefix lookup host memory failed\n");
     return;
   }
 
@@ -440,9 +490,9 @@ void GPUEngine::SetPrefix(std::vector<LPREFIX> prefixes, uint32_t totalPrefix) {
   cudaMemcpy(inputPrefixLookUp, inputPrefixLookUpPinned, (_64K+totalPrefix) * 4, cudaMemcpyHostToDevice);
 
   // We do not need the input pinned memory anymore
-  cudaFreeHost(inputPrefixPinned);
+  FreeHostBuffer(inputPrefixPinned, inputPrefixPinnedCuda);
   inputPrefixPinned = NULL;
-  cudaFreeHost(inputPrefixLookUpPinned);
+  FreeHostBuffer(inputPrefixLookUpPinned, inputPrefixLookUpPinnedCuda);
   inputPrefixLookUpPinned = NULL;
   lostWarning = false;
 
@@ -526,7 +576,7 @@ bool GPUEngine::SetKeys(Point *p) {
 
   if (!rekey) {
     // We do not need the input pinned memory anymore
-    cudaFreeHost(inputKeyPinned);
+    FreeHostBuffer(inputKeyPinned, inputKeyPinnedCuda);
     inputKeyPinned = NULL;
   }
 
@@ -546,7 +596,7 @@ bool GPUEngine::Launch(std::vector<ITEM> &prefixFound,bool spinWait) {
 
   // Get the result
 
-  if(spinWait) {
+  if(spinWait || !outputPrefixPinnedCuda) {
 
     cudaMemcpy(outputPrefixPinned, outputPrefix, outputSize, cudaMemcpyDeviceToHost);
 

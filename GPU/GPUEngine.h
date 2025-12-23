@@ -85,12 +85,16 @@ private:
   int nbThreadPerGroup;
   prefix_t *inputPrefix;
   prefix_t *inputPrefixPinned;
+  bool inputPrefixPinnedCuda;
   uint32_t *inputPrefixLookUp;
   uint32_t *inputPrefixLookUpPinned;
+  bool inputPrefixLookUpPinnedCuda;
   uint64_t *inputKey;
   uint64_t *inputKeyPinned;
+  bool inputKeyPinnedCuda;
   uint32_t *outputPrefix;
   uint32_t *outputPrefixPinned;
+  bool outputPrefixPinnedCuda;
   bool initialised;
   uint32_t searchMode;
   uint32_t searchType;
