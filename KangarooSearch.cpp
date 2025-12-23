@@ -261,9 +261,13 @@ Int KangarooSearch::ReconstructPrivateKey(const DistinguishedPoint &tameDP,
   // k = rangeStart + d_tame + d_wild
   
   Int privateKey;
+  Int tempTame, tempWild;
+  tempTame.Set((Int*)&tameDP.distance);
+  tempWild.Set((Int*)&wildDP.distance);
+  
   privateKey.Set(&rangeStart);
-  privateKey.Add(&tameDP.distance);
-  privateKey.Add(&wildDP.distance);
+  privateKey.Add(&tempTame);
+  privateKey.Add(&tempWild);
   
   // Модуль по order кривой для корректности
   privateKey.Mod(&secp->order);
@@ -349,7 +353,9 @@ uint64_t KangarooSearch::GetDistinguishedPointsFound() const {
 
 double KangarooSearch::GetExpectedOperations() const {
   // Ожидаемое количество операций: sqrt(rangeSize) * sqrt(pi/2)
-  double rangeSqrt = sqrt(rangeSize.ToDouble());
+  Int tempSize;
+  tempSize.Set((Int*)&rangeSize);
+  double rangeSqrt = sqrt(tempSize.ToDouble());
   double expected = rangeSqrt * sqrt(M_PI / 2.0);
   
   if (expected > 0) {
