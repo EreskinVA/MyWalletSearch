@@ -29,7 +29,29 @@
 // Include intrin.h in .cpp file to provide intrinsics implementation
 // This avoids including it in the header file which would pull in winnt.h
 // and cause conflicts
+// Suppress warnings about macro redefinitions in Windows SDK headers
+#pragma warning(push)
+#pragma warning(disable: 4005) // macro redefinition
+#pragma warning(disable: 4091) // typedef ignored
 #include <intrin.h>
+#pragma warning(pop)
+
+// Implement the wrapper functions that are declared in Int.h
+// These wrap MSVC intrinsics to match the interface used in the code
+// Note: These must NOT be static, as they are used in Int.h inline functions
+inline unsigned char addcarry_u64_u64p(unsigned char c, uint64_t a, uint64_t b, uint64_t *out) {
+  return _addcarry_u64(c,
+                       (unsigned long long)a,
+                       (unsigned long long)b,
+                       (unsigned long long *)out);
+}
+
+inline unsigned char subborrow_u64_u64p(unsigned char c, uint64_t a, uint64_t b, uint64_t *out) {
+  return _subborrow_u64(c,
+                        (unsigned long long)a,
+                        (unsigned long long)b,
+                        (unsigned long long *)out);
+}
 #endif
 #include "Timer.h"
 

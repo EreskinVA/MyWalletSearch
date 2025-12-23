@@ -354,34 +354,19 @@ static inline unsigned char subborrow_u64_u64p(unsigned char c, uint64_t a, uint
 
 // Windows/MSVC
 // NOMINMAX and WIN32_LEAN_AND_MEAN should already be defined at the top of the file
-// We must include intrin.h to get the intrinsics, but this will pull in winnt.h
-// The key is to ensure NOMINMAX and WIN32_LEAN_AND_MEAN are defined FIRST
-// Suppress warnings about macro redefinitions in Windows SDK headers
-#pragma warning(push)
-#pragma warning(disable: 4005) // macro redefinition
-#pragma warning(disable: 4091) // typedef ignored
-#include <intrin.h>
-#pragma warning(pop)
+// DO NOT include <intrin.h> here - it's included in Int.cpp after WindowsCompat.h
+// This prevents winnt.h from being included in header files
 
-// Define our helper macros
+// Forward declarations - implementations are in Int.cpp after <intrin.h> is included
+// These wrap MSVC intrinsics to match the interface used in the code
+// Note: These are declared as inline functions in Int.cpp, but we need forward declarations here
+unsigned char addcarry_u64_u64p(unsigned char c, uint64_t a, uint64_t b, uint64_t *out);
+unsigned char subborrow_u64_u64p(unsigned char c, uint64_t a, uint64_t b, uint64_t *out);
+
+// Define our helper macros (intrinsics will be available from Int.cpp)
+// Note: These macros use intrinsics that are available after Int.cpp includes <intrin.h>
 #define TZC(x) _tzcnt_u64(x)
 #define LZC(x) _lzcnt_u64(x)
-
-// MSVC has _addcarry_u64 and _subborrow_u64 intrinsics
-// Wrap them to match the interface used in the code
-static inline unsigned char addcarry_u64_u64p(unsigned char c, uint64_t a, uint64_t b, uint64_t *out) {
-  return _addcarry_u64(c,
-                       (unsigned long long)a,
-                       (unsigned long long)b,
-                       (unsigned long long *)out);
-}
-
-static inline unsigned char subborrow_u64_u64p(unsigned char c, uint64_t a, uint64_t b, uint64_t *out) {
-  return _subborrow_u64(c,
-                        (unsigned long long)a,
-                        (unsigned long long)b,
-                        (unsigned long long *)out);
-}
 
 // MSVC has _umul128 built-in as an intrinsic
 // _umul128 is already declared above - do NOT redefine it!
