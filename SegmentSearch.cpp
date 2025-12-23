@@ -8,6 +8,7 @@
 #include <sstream>
 #include <iostream>
 #include <algorithm>
+#include <mutex>
 
 SegmentSearch::SegmentSearch() {
   bitRange = 0;
@@ -337,6 +338,10 @@ void SegmentSearch::EnableProgressSaving(const std::string &progressFile, int au
   progressManager->SetProgressFile(progressFile);
   progressManager->EnableAutoSave(autoSaveInterval);
   progressSavingEnabled = true;
+  {
+    std::lock_guard<std::mutex> lk(progressMutex);
+    EnsureProgressInitialized();
+  }
   
   printf("[SegmentSearch] Сохранение прогресса включено: %s\n", progressFile.c_str());
 }
@@ -345,17 +350,33 @@ bool SegmentSearch::SaveProgress(const std::string &targetAddress) {
   if (!progressSavingEnabled || progressManager == NULL) {
     return false;
   }
-  
-  ExportToProgress();
-  currentProgress.targetAddress = targetAddress;
-  currentProgress.lastSaveTime = time(NULL);
-  
-  bool result = progressManager->SaveProgress(currentProgress);
-  if (result) {
-    progressManager->MarkSaved();
-    keysCheckedSinceLastSave = 0;
+
+  // Prevent concurrent saves from multiple worker threads
+  if (saveInProgress.exchange(true)) {
+    return false;
   }
-  
+
+  SearchProgress snapshot;
+  {
+    std::lock_guard<std::mutex> lk(progressMutex);
+    EnsureProgressInitialized();
+    snapshot = currentProgress;
+    ExportToProgress(snapshot);
+    snapshot.targetAddress = targetAddress;
+    snapshot.lastSaveTime = time(NULL);
+  }
+
+  bool result = progressManager->SaveProgress(snapshot);
+  {
+    std::lock_guard<std::mutex> lk(progressMutex);
+    if (result) {
+      progressManager->MarkSaved();
+      keysCheckedSinceLastSave = 0;
+      currentProgress.lastSaveTime = snapshot.lastSaveTime;
+    }
+  }
+
+  saveInProgress.store(false);
   return result;
 }
 
@@ -403,13 +424,29 @@ void SegmentSearch::UpdateProgress(int threadId, uint64_t keysChecked) {
   
   int segIdx = GetSegmentForThread(threadId);
   if (segIdx >= 0 && segIdx < (int)segments.size()) {
-    ProgressManager::UpdateSegmentProgress(currentProgress, segIdx, 
-                                            segments[segIdx].currentKey, keysChecked);
-    keysCheckedSinceLastSave += keysChecked;
-    
-    // Автосохранение
-    if (ShouldAutoSave()) {
-      SaveProgress(currentProgress.targetAddress);
+    bool doSave = false;
+    std::string targetAddr;
+    {
+      std::lock_guard<std::mutex> lk(progressMutex);
+      EnsureProgressInitialized();
+
+      SegmentProgress &sp = currentProgress.segments[segIdx];
+      sp.currentKey = segments[segIdx].currentKey.GetBase16();
+      sp.keysChecked += keysChecked;
+      sp.lastUpdate = time(NULL);
+      sp.active = segments[segIdx].active;
+
+      currentProgress.totalKeysChecked += keysChecked;
+      keysCheckedSinceLastSave += keysChecked;
+
+      if (progressManager != NULL && progressManager->ShouldSave() && !saveInProgress.load()) {
+        doSave = true;
+        targetAddr = currentProgress.targetAddress;
+      }
+    }
+
+    if (doSave) {
+      SaveProgress(targetAddr);
     }
   }
 }
@@ -422,10 +459,11 @@ bool SegmentSearch::ShouldAutoSave() {
   return progressManager->ShouldSave();
 }
 
-void SegmentSearch::ExportToProgress() {
+void SegmentSearch::EnsureProgressInitialized() {
+  if ((int)currentProgress.segments.size() == (int)segments.size()) return;
   currentProgress.bitRange = bitRange;
   currentProgress.segments.clear();
-  
+  currentProgress.segments.reserve(segments.size());
   for (size_t i = 0; i < segments.size(); i++) {
     SegmentProgress sp;
     sp.name = segments[i].name;
@@ -434,10 +472,28 @@ void SegmentSearch::ExportToProgress() {
     sp.direction = (segments[i].direction == DIRECTION_UP) ? 0 : 1;
     sp.currentKey = segments[i].currentKey.GetBase16();
     sp.active = segments[i].active;
-    sp.keysChecked = 0;  // Будет обновлено при UpdateProgress
+    sp.keysChecked = 0;
     sp.lastUpdate = time(NULL);
-    
     currentProgress.segments.push_back(sp);
+  }
+}
+
+void SegmentSearch::ExportToProgress(SearchProgress &dst) const {
+  dst.bitRange = bitRange;
+  dst.segments.clear();
+  dst.segments.reserve(segments.size());
+  for (size_t i = 0; i < segments.size(); i++) {
+    SegmentProgress sp;
+    sp.name = segments[i].name;
+    sp.startPercent = segments[i].startPercent;
+    sp.endPercent = segments[i].endPercent;
+    sp.direction = (segments[i].direction == DIRECTION_UP) ? 0 : 1;
+    sp.currentKey = segments[i].currentKey.GetBase16();
+    sp.active = segments[i].active;
+    if (i < currentProgress.segments.size()) sp.keysChecked = currentProgress.segments[i].keysChecked;
+    else sp.keysChecked = 0;
+    sp.lastUpdate = time(NULL);
+    dst.segments.push_back(std::move(sp));
   }
 }
 

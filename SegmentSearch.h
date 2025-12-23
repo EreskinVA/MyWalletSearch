@@ -12,6 +12,8 @@
 #include "KangarooSearch.h"
 #include <vector>
 #include <string>
+#include <mutex>
+#include <atomic>
 
 // Направление поиска в сегменте
 enum SearchDirection {
@@ -99,6 +101,10 @@ private:
   Int fullRangeSize;     // Размер полного диапазона
   int activeSegments;
   
+  // Protects currentProgress/progressManager and prevents concurrent SaveProgress calls
+  mutable std::mutex progressMutex;
+  std::atomic<bool> saveInProgress{false};
+  
   // Progress management
   ProgressManager *progressManager;
   SearchProgress currentProgress;
@@ -118,9 +124,12 @@ private:
   
   // Распределить сегменты между потоками (с учётом балансировки)
   int GetSegmentForThread(int threadId);
+
+  // Snapshot current segments into a progress structure (thread-safe when called under progressMutex)
+  void ExportToProgress(SearchProgress &dst) const;
+  void EnsureProgressInitialized();
   
   // Конвертация между SegmentProgress и SearchSegment
-  void ExportToProgress();
   void ImportFromProgress();
 };
 
