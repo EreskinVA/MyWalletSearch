@@ -1284,7 +1284,7 @@ void  Int::SetBaseN(int n,char *charset,char *value) {
 
 // ------------------------------------------------
 
-std::string Int::GetBaseN(int n,char *charset) {
+std::string Int::GetBaseN(int n, const char *charset) const {
 
   std::string ret;
 
