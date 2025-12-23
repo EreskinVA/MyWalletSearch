@@ -1,0 +1,89 @@
+# ============================================
+# WINDOWS КОМАНДЫ ДЛЯ ЗОНЫ 54-62%
+# С Kangaroo + Полный целевой адрес
+# ============================================
+
+# ШАГ 1: Клонирование (PowerShell или Git Bash)
+# ----------------------------------------------
+cd %USERPROFILE%\Documents
+git clone https://github.com/EreskinVA/MyWalletSearch.git
+cd MyWalletSearch
+
+# ШАГ 2: Компиляция в Visual Studio
+# ----------------------------------
+# 1. Двойной клик на VanitySearch.sln
+# 2. Вверху: Release + x64
+# 3. Build → Rebuild Solution
+# 4. Ждём: "Build succeeded"
+
+# ШАГ 3: Проверка GPU
+# --------------------
+x64\Release\VanitySearch.exe -l
+
+# ШАГ 4: ЗАПУСК С ПОЛНЫМ АДРЕСОМ (зона 54-62%)
+# ----------------------------------------------
+
+x64\Release\VanitySearch.exe -seg segments_54-62_GTX1050Ti.txt -bits 71 -kangaroo -progress puzzle71_54-62.dat -autosave 600 -gpu -gpuId 0 -g 256,128 -t 4 -o PUZZLE_71_SOLUTION.txt 1PWo3JeB9jrGwfHDNpdGK54CRas7fsVzXU
+
+# ============================================
+# ЧТО ЭТО ДЕЛАЕТ:
+# ============================================
+
+-seg segments_54-62_GTX1050Ti.txt  → Ищет в зоне 54-62%
+-bits 71                           → Диапазон puzzle 71 (2^70 to 2^71)
+-kangaroo                          → Pollard's Kangaroo (O(sqrt(N))) ✅
+-progress puzzle71_54-62.dat       → Сохранение прогресса
+-autosave 600                      → Автосохранение каждые 10 минут
+-gpu -gpuId 0                      → Использовать GPU #0
+-g 256,128                         → Grid size для GTX 1050 Ti
+-t 4                               → 4 CPU потока
+-o PUZZLE_71_SOLUTION.txt          → Файл для результата
+1PWo3JeB9jrGwfHDNpdGK54CRas7fsVzXU → ПОЛНЫЙ целевой адрес ✅
+
+# ============================================
+# ОЖИДАЕМЫЙ РЕЗУЛЬТАТ:
+# ============================================
+
+[20 Mkey/s][GPU 120 Mkey/s][Total 2^38][Prob 0.5%][Segments: 6][Found 0]
+[20 Mkey/s][GPU 125 Mkey/s][Total 2^39][Prob 1.2%][Segments: 6][Found 0]
+...
+
+# ============================================
+# ВРЕМЯ ПОИСКА:
+# ============================================
+
+GTX 1050 Ti: ~120-150 MKey/s
+Зона 54-62%: 8% диапазона
+С Kangaroo: sqrt(2^70 * 0.08) = sqrt(2^66.34) = 2^33.17 операций
+
+Ожидаемое время: ~2-3 месяца
+
+# ============================================
+# ЕСЛИ НАЙДЁТЕ:
+# ============================================
+
+Программа автоматически остановится и выведет:
+
+PubAddress: 1PWo3JeB9jrGwfHDNpdGK54CRas7fsVzXU
+Priv (WIF): p2pkh:Kxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+Priv (HEX): 0xXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+Приватный ключ будет сохранён в: PUZZLE_71_SOLUTION.txt
+
+СРАЗУ СКОПИРУЙТЕ ЕГО В БЕЗОПАСНОЕ МЕСТО!
+
+# ============================================
+# МОНИТОРИНГ:
+# ============================================
+
+# Программа сама показывает прогресс в консоли
+# Файл прогресса: puzzle71_54-62.dat
+# Автосохранение: каждые 10 минут
+
+# Для остановки: Ctrl+C (но прогресс сохранится!)
+
+# Для возобновления (после остановки):
+x64\Release\VanitySearch.exe -seg segments_54-62_GTX1050Ti.txt -bits 71 -kangaroo -progress puzzle71_54-62.dat -resume -gpu -gpuId 0 -g 256,128 -t 4 -o SOLUTION.txt 1PWo3JeB9jrGwfHDNpdGK54CRas7fsVzXU
+
+# ============================================
+

@@ -12,7 +12,15 @@ SRC_COMMON = Base58.cpp IntGroup.cpp main.cpp Random.cpp \
 SRC_X86 = hash/ripemd160_sse.cpp hash/sha256_sse.cpp AVX512.cpp AVX512BatchProcessor.cpp
 SRC_ARM = NEON_ARM.cpp
 
-OBJDIR = obj
+# Use separate object directories for CPU/GPU builds to avoid stale .o files
+# when switching `make` <-> `make gpu=1` (CXXFLAGS changes do not auto-trigger rebuilds).
+OBJDIR_CPU = obj
+OBJDIR_GPU = obj_gpu
+ifdef gpu
+OBJDIR = $(OBJDIR_GPU)
+else
+OBJDIR = $(OBJDIR_CPU)
+endif
 
 ARCH := $(shell uname -m)
 
@@ -101,7 +109,6 @@ $(OBJDIR)/hash: $(OBJDIR)
 
 clean:
 	@echo Cleaning...
-	@rm -f obj/*.o
-	@rm -f obj/GPU/*.o
-	@rm -f obj/hash/*.o
+	@rm -rf $(OBJDIR_CPU) $(OBJDIR_GPU)
+	@rm -f VanitySearch
 
