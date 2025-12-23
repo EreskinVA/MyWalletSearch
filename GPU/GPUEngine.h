@@ -28,7 +28,7 @@
 static const char *searchModes[] = {"Compressed","Uncompressed","Compressed or Uncompressed"};
 
 // Number of key per thread (must be a multiple of GRP_SIZE) per kernel call
-#define STEP_SIZE 1024
+#define STEP_SIZE 64
 
 // Number of thread per block
 #define ITEM_SIZE 28
