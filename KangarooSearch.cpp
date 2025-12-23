@@ -387,12 +387,151 @@ void KangarooSearch::SetNumKangaroos(int tame, int wild) {
 }
 
 bool KangarooSearch::SaveState(const std::string &filename) {
-  // TODO: Реализовать сохранение для long-running поиска
-  return false;
+  std::ofstream file(filename.c_str(), std::ios::binary);
+  if (!file.is_open()) {
+    printf("[Kangaroo] Ошибка: не удалось открыть %s для записи\n", filename.c_str());
+    return false;
+  }
+  
+  // Заголовок
+  file << "KANGAROO_STATE_V1\n";
+  file << "RangeStart=" << rangeStart.GetBase16() << "\n";
+  file << "RangeEnd=" << rangeEnd.GetBase16() << "\n";
+  file << "TargetPubKeyX=" << targetPubKey.x.GetBase16() << "\n";
+  file << "TargetPubKeyY=" << targetPubKey.y.GetBase16() << "\n";
+  file << "TotalJumps=" << totalJumps << "\n";
+  file << "DPsFound=" << distinguishedPointsFound << "\n";
+  file << "JumpBits=" << jumpDistanceBits << "\n";
+  file << "DPBits=" << distinguishedBits << "\n";
+  
+  // Tame кенгуру
+  file << "TameKangaroos=" << tameKangaroos.size() << "\n";
+  for (size_t i = 0; i < tameKangaroos.size(); i++) {
+    file << "T_PosX=" << tameKangaroos[i].position.x.GetBase16() << "\n";
+    file << "T_PosY=" << tameKangaroos[i].position.y.GetBase16() << "\n";
+    file << "T_Dist=" << tameKangaroos[i].distance.GetBase16() << "\n";
+    file << "T_Jumps=" << tameKangaroos[i].jumps << "\n";
+  }
+  
+  // Wild кенгуру
+  file << "WildKangaroos=" << wildKangaroos.size() << "\n";
+  for (size_t i = 0; i < wildKangaroos.size(); i++) {
+    file << "W_PosX=" << wildKangaroos[i].position.x.GetBase16() << "\n";
+    file << "W_PosY=" << wildKangaroos[i].position.y.GetBase16() << "\n";
+    file << "W_Dist=" << wildKangaroos[i].distance.GetBase16() << "\n";
+    file << "W_Jumps=" << wildKangaroos[i].jumps << "\n";
+  }
+  
+  // Distinguished points
+  file << "DPCount=" << distinguishedPoints.size() << "\n";
+  for (const auto &pair : distinguishedPoints) {
+    const DistinguishedPoint &dp = pair.second;
+    file << "DP_Hash=" << dp.dpHash << "\n";
+    file << "DP_PosX=" << dp.position.x.GetBase16() << "\n";
+    file << "DP_PosY=" << dp.position.y.GetBase16() << "\n";
+    file << "DP_Dist=" << dp.distance.GetBase16() << "\n";
+    file << "DP_Tame=" << (dp.isTame ? "1" : "0") << "\n";
+  }
+  
+  file << "END\n";
+  file.close();
+  
+  printf("[Kangaroo] ✓ Состояние сохранено: %s\n", filename.c_str());
+  return true;
 }
 
 bool KangarooSearch::LoadState(const std::string &filename) {
-  // TODO: Реализовать загрузку состояния
-  return false;
+  std::ifstream file(filename.c_str());
+  if (!file.is_open()) {
+    printf("[Kangaroo] Файл состояния не найден: %s\n", filename.c_str());
+    return false;
+  }
+  
+  printf("[Kangaroo] Загрузка состояния из %s...\n", filename.c_str());
+  
+  std::string line;
+  int tameCount = 0;
+  int wildCount = 0;
+  int dpCount = 0;
+  int tameIdx = 0, wildIdx = 0, dpIdx = 0;
+  
+  DistinguishedPoint currentDP;
+  
+  while (std::getline(file, line)) {
+    if (line.empty() || line == "END") continue;
+    
+    size_t eqPos = line.find('=');
+    if (eqPos != std::string::npos) {
+      std::string key = line.substr(0, eqPos);
+      std::string value = line.substr(eqPos + 1);
+      
+      if (key == "RangeStart") {
+        rangeStart.SetBase16((char*)value.c_str());
+      } else if (key == "RangeEnd") {
+        rangeEnd.SetBase16((char*)value.c_str());
+      } else if (key == "TotalJumps") {
+        totalJumps = strtoull(value.c_str(), NULL, 10);
+      } else if (key == "DPsFound") {
+        distinguishedPointsFound = strtoull(value.c_str(), NULL, 10);
+      } else if (key == "JumpBits") {
+        jumpDistanceBits = atoi(value.c_str());
+      } else if (key == "DPBits") {
+        distinguishedBits = atoi(value.c_str());
+      } else if (key == "TameKangaroos") {
+        tameCount = atoi(value.c_str());
+        tameKangaroos.resize(tameCount);
+      } else if (key == "WildKangaroos") {
+        wildCount = atoi(value.c_str());
+        wildKangaroos.resize(wildCount);
+      } else if (key == "DPCount") {
+        dpCount = atoi(value.c_str());
+      }
+      // Tame kangaroo data
+      else if (key == "T_PosX" && tameIdx < tameCount) {
+        tameKangaroos[tameIdx].position.x.SetBase16((char*)value.c_str());
+      } else if (key == "T_PosY" && tameIdx < tameCount) {
+        tameKangaroos[tameIdx].position.y.SetBase16((char*)value.c_str());
+      } else if (key == "T_Dist" && tameIdx < tameCount) {
+        tameKangaroos[tameIdx].distance.SetBase16((char*)value.c_str());
+      } else if (key == "T_Jumps" && tameIdx < tameCount) {
+        tameKangaroos[tameIdx].jumps = strtoull(value.c_str(), NULL, 10);
+        tameIdx++;
+      }
+      // Wild kangaroo data
+      else if (key == "W_PosX" && wildIdx < wildCount) {
+        wildKangaroos[wildIdx].position.x.SetBase16((char*)value.c_str());
+      } else if (key == "W_PosY" && wildIdx < wildCount) {
+        wildKangaroos[wildIdx].position.y.SetBase16((char*)value.c_str());
+      } else if (key == "W_Dist" && wildIdx < wildCount) {
+        wildKangaroos[wildIdx].distance.SetBase16((char*)value.c_str());
+      } else if (key == "W_Jumps" && wildIdx < wildCount) {
+        wildKangaroos[wildIdx].jumps = strtoull(value.c_str(), NULL, 10);
+        wildIdx++;
+      }
+      // Distinguished points
+      else if (key == "DP_Hash") {
+        currentDP.dpHash = value;
+      } else if (key == "DP_PosX") {
+        currentDP.position.x.SetBase16((char*)value.c_str());
+      } else if (key == "DP_PosY") {
+        currentDP.position.y.SetBase16((char*)value.c_str());
+      } else if (key == "DP_Dist") {
+        currentDP.distance.SetBase16((char*)value.c_str());
+      } else if (key == "DP_Tame") {
+        currentDP.isTame = (value == "1");
+        distinguishedPoints[currentDP.dpHash] = currentDP;
+      }
+    }
+  }
+  
+  file.close();
+  
+  printf("[Kangaroo] ✓ Состояние загружено\n");
+  printf("[Kangaroo]   Tame кенгуру: %d\n", tameCount);
+  printf("[Kangaroo]   Wild кенгуру: %d\n", wildCount);
+  printf("[Kangaroo]   Distinguished points: %lu\n", distinguishedPoints.size());
+  printf("[Kangaroo]   Всего прыжков: %llu\n", (unsigned long long)totalJumps);
+  
+  return true;
 }
 

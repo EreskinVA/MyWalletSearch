@@ -9,7 +9,7 @@ SRC = Base58.cpp IntGroup.cpp main.cpp Random.cpp \
       hash/sha256.cpp hash/sha512.cpp hash/ripemd160_sse.cpp \
       hash/sha256_sse.cpp Bech32.cpp Wildcard.cpp SegmentSearch.cpp \
       ProgressManager.cpp LoadBalancer.cpp AdaptivePriority.cpp KangarooSearch.cpp \
-      AVX512.cpp AVX512BatchProcessor.cpp
+      AVX512.cpp AVX512BatchProcessor.cpp NEON_ARM.cpp
 
 OBJDIR = obj
 
@@ -22,7 +22,7 @@ OBJET = $(addprefix $(OBJDIR)/, \
         hash/ripemd160_sse.o hash/sha256_sse.o \
         GPU/GPUEngine.o Bech32.o Wildcard.o SegmentSearch.o \
         ProgressManager.o LoadBalancer.o AdaptivePriority.o KangarooSearch.o \
-        AVX512.o AVX512BatchProcessor.o)
+        AVX512.o AVX512BatchProcessor.o NEON_ARM.o)
 
 else
 
@@ -32,7 +32,7 @@ OBJET = $(addprefix $(OBJDIR)/, \
         hash/ripemd160.o hash/sha256.o hash/sha512.o \
         hash/ripemd160_sse.o hash/sha256_sse.o Bech32.o Wildcard.o \
         SegmentSearch.o ProgressManager.o LoadBalancer.o AdaptivePriority.o \
-        KangarooSearch.o AVX512.o AVX512BatchProcessor.o)
+        KangarooSearch.o AVX512.o AVX512BatchProcessor.o NEON_ARM.o)
 
 endif
 
@@ -43,18 +43,33 @@ NVCC       = $(CUDA)/bin/nvcc
 # nvcc requires joint notation w/o dot, i.e. "5.2" -> "52"
 ccap       = $(shell echo $(CCAP) | tr -d '.')
 
+# Определение архитектуры
+ARCH := $(shell uname -m)
+
+# Флаги для разных архитектур
+ifeq ($(ARCH),arm64)
+    # ARM (Apple Silicon M1/M2/M3)
+    ARCHFLAGS = -march=armv8-a+crypto+simd
+else ifeq ($(ARCH),aarch64)
+    # ARM64 (Linux)
+    ARCHFLAGS = -march=armv8-a+crypto+simd
+else
+    # x86_64 (Intel/AMD)
+    ARCHFLAGS = -m64 -mssse3
+endif
+
 ifdef gpu
 ifdef debug
-CXXFLAGS   = -DWITHGPU -m64  -mssse3 -Wno-write-strings -g -I. -I$(CUDA)/include
+CXXFLAGS   = -DWITHGPU $(ARCHFLAGS) -Wno-write-strings -g -I. -I$(CUDA)/include
 else
-CXXFLAGS   =  -DWITHGPU -m64 -mssse3 -Wno-write-strings -O2 -I. -I$(CUDA)/include
+CXXFLAGS   =  -DWITHGPU $(ARCHFLAGS) -Wno-write-strings -O3 -I. -I$(CUDA)/include
 endif
 LFLAGS     = -lpthread -L$(CUDA)/lib64 -lcudart
 else
 ifdef debug
-CXXFLAGS   = -m64 -mssse3 -Wno-write-strings -g -I. -I$(CUDA)/include
+CXXFLAGS   = $(ARCHFLAGS) -Wno-write-strings -g -I. -I$(CUDA)/include
 else
-CXXFLAGS   =  -m64 -mssse3 -Wno-write-strings -O2 -I. -I$(CUDA)/include
+CXXFLAGS   =  $(ARCHFLAGS) -Wno-write-strings -O3 -I. -I$(CUDA)/include
 endif
 LFLAGS     = -lpthread
 endif

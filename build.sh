@@ -35,22 +35,50 @@ check_avx512() {
 # Определение оптимальных флагов
 CXXFLAGS_OPT=""
 USE_AVX512=false
+USE_NEON=false
+ARCH_TYPE="unknown"
 
-if check_avx512; then
-    echo "✅ AVX-512 обнаружен!"
+if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
+    # ARM архитектура (Apple Silicon или ARM Linux)
+    echo "🍎 Обнаружен ARM64 процессор (Apple Silicon или ARM)"
+    ARCH_TYPE="ARM"
+    USE_NEON=true
+    
+    if [ "$OS" = "Darwin" ]; then
+        # macOS (Apple Silicon)
+        echo "Компиляция для Apple Silicon M1/M2/M3..."
+        CXXFLAGS_OPT="-mcpu=apple-m1 -O3 -march=armv8-a+crypto+simd"
+    else
+        # Linux ARM
+        echo "Компиляция для ARM64 Linux..."
+        CXXFLAGS_OPT="-O3 -march=armv8-a+crypto+simd"
+    fi
+    
+    echo "✅ NEON SIMD будет использован"
+    echo "   Обработка: 4 ключа параллельно"
+    echo "   Ускорение: 2-4x"
+    
+elif check_avx512; then
+    # x86 с AVX-512
+    echo "⚡ AVX-512 обнаружен!"
+    ARCH_TYPE="x86_AVX512"
     echo "Компиляция с AVX-512 поддержкой..."
     USE_AVX512=true
     CXXFLAGS_OPT="-mavx512f -mavx512dq -mavx512bw -mavx512vl -O3 -march=native"
+    
+    echo "✅ AVX-512 SIMD будет использован"
+    echo "   Обработка: 8 ключей параллельно"
+    echo "   Ускорение: 4-8x"
+    
 else
-    echo "⚠️  AVX-512 не обнаружен"
+    # x86 без AVX-512
+    echo "💻 x86_64 процессор без AVX-512"
+    ARCH_TYPE="x86"
     echo "Компиляция со стандартными оптимизациями..."
-    if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
-        # Apple Silicon или ARM
-        CXXFLAGS_OPT="-O3 -march=native"
-    else
-        # Intel/AMD без AVX-512
-        CXXFLAGS_OPT="-mavx2 -O3 -march=native"
-    fi
+    CXXFLAGS_OPT="-mavx2 -O3 -march=native"
+    
+    echo "✅ AVX2/SSE будет использован"
+    echo "   Ускорение: 2-3x"
 fi
 
 echo ""
@@ -94,10 +122,14 @@ if [ -f "VanitySearch" ]; then
     echo "   ./VanitySearch -seg segments_puzzle71.txt -bits 71 -t 8 1FshYo"
     echo ""
     
+    echo "🎯 Архитектура: $ARCH_TYPE"
+    
     if [ "$USE_AVX512" = true ]; then
         echo "⚡ AVX-512 включен - ожидаемое ускорение: 4-8x"
-        echo ""
+    elif [ "$USE_NEON" = true ]; then
+        echo "🍎 ARM NEON включен - ожидаемое ускорение: 2-4x"
     fi
+    echo ""
     
     echo "📚 Документация:"
     echo "   cat QUICK_START_RU.md"
