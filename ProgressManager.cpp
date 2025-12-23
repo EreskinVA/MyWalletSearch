@@ -46,7 +46,9 @@ SearchProgress ProgressManager::CreateProgress(int bitRange, const std::string &
 void ProgressManager::UpdateSegmentProgress(SearchProgress &progress, int segmentIndex,
                                              const Int &currentKey, uint64_t keysChecked) {
   if (segmentIndex >= 0 && segmentIndex < (int)progress.segments.size()) {
-    progress.segments[segmentIndex].currentKey = currentKey.GetBase16();
+    Int tempKey;
+    tempKey.Set((Int*)&currentKey);
+    progress.segments[segmentIndex].currentKey = tempKey.GetBase16();
     progress.segments[segmentIndex].keysChecked = keysChecked;
     progress.segments[segmentIndex].lastUpdate = time(NULL);
     progress.totalKeysChecked += keysChecked;
