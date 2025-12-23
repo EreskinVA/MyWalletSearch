@@ -814,16 +814,16 @@ uint64_t Int::IMult(Int *a, int64_t b) {
   if (b < 0LL) {
 
     unsigned char c = 0;
-    c = _subborrow_u64(c,0,a->bits64[0],bits64 + 0);
-    c = _subborrow_u64(c,0,a->bits64[1],bits64 + 1);
-    c = _subborrow_u64(c,0,a->bits64[2],bits64 + 2);
-    c = _subborrow_u64(c,0,a->bits64[3],bits64 + 3);
-    c = _subborrow_u64(c,0,a->bits64[4],bits64 + 4);
+    c = _subborrow_u64(c,0,a->bits64[0],(unsigned long long *)(bits64 + 0));
+    c = _subborrow_u64(c,0,a->bits64[1],(unsigned long long *)(bits64 + 1));
+    c = _subborrow_u64(c,0,a->bits64[2],(unsigned long long *)(bits64 + 2));
+    c = _subborrow_u64(c,0,a->bits64[3],(unsigned long long *)(bits64 + 3));
+    c = _subborrow_u64(c,0,a->bits64[4],(unsigned long long *)(bits64 + 4));
 #if NB64BLOCK > 5
-    c = _subborrow_u64(c,0,a->bits64[5],bits64 + 5);
-    c = _subborrow_u64(c,0,a->bits64[6],bits64 + 6);
-    c = _subborrow_u64(c,0,a->bits64[7],bits64 + 7);
-    c = _subborrow_u64(c,0,a->bits64[8],bits64 + 8);
+    c = _subborrow_u64(c,0,a->bits64[5],(unsigned long long *)(bits64 + 5));
+    c = _subborrow_u64(c,0,a->bits64[6],(unsigned long long *)(bits64 + 6));
+    c = _subborrow_u64(c,0,a->bits64[7],(unsigned long long *)(bits64 + 7));
+    c = _subborrow_u64(c,0,a->bits64[8],(unsigned long long *)(bits64 + 8));
 #endif
 
   	b = -b;
@@ -864,7 +864,7 @@ void Int::Mult(Int *a,Int *b) {
 
   for (int i = 1; i < NB64BLOCK; i++) {
     for (int j = 0; j <= i; j++) {
-      c = _addcarry_u64(c, _umul128(a->bits64[j], b->bits64[i - j], &h), pr, &pr);
+      c = _addcarry_u64(c, _umul128(a->bits64[j], b->bits64[i - j], &h), pr, (unsigned long long *)&pr);
       c = _addcarry_u64(c, carryl, h, (unsigned long long *)&carryl);
       c = _addcarry_u64(c, carryh, 0, (unsigned long long *)&carryh);
     }
