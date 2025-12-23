@@ -273,15 +273,25 @@ GPUEngine::GPUEngine(int nbThreadGroup, int nbThreadPerGroup, int gpuId, uint32_
   // Prefer L1 (We do not use __shared__ at all)
   err = cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
   if (err != cudaSuccess) {
-    printf("GPUEngine: %s\n", cudaGetErrorString(err));
-    return;
+    printf("GPUEngine: cudaDeviceSetCacheConfig(preferL1) failed: %s\n", cudaGetErrorString(err));
+    // Non-fatal: keep default cache config
   }
 
-  size_t stackSize = 49152;
-  err = cudaDeviceSetLimit(cudaLimitStackSize, stackSize);
-  if (err != cudaSuccess) {
-    printf("GPUEngine: %s\n", cudaGetErrorString(err));
-    return;
+  // Some environments/drivers enforce strict limits; treat as non-fatal and fallback.
+  // We do set it because some device functions use non-trivial stack, but we'll degrade gracefully.
+  size_t stackCandidates[] = {49152, 32768, 16384, 8192, 4096};
+  bool stackOk = false;
+  for (size_t k = 0; k < sizeof(stackCandidates) / sizeof(stackCandidates[0]); k++) {
+    size_t stackSize = stackCandidates[k];
+    err = cudaDeviceSetLimit(cudaLimitStackSize, stackSize);
+    if (err == cudaSuccess) {
+      stackOk = true;
+      break;
+    }
+    printf("GPUEngine: cudaDeviceSetLimit(stack=%zu) failed: %s\n", stackSize, cudaGetErrorString(err));
+  }
+  if (!stackOk) {
+    printf("GPUEngine: Warning: unable to set cudaLimitStackSize, continuing with default\n");
   }
 
   /*
