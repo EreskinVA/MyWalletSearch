@@ -126,32 +126,3 @@ void AVX512BatchProcessor::PrintStats() const {
     printf("=========================\n");
 }
 
-#ifndef __AVX512F__
-// Заглушки если AVX-512 не скомпилирован
-
-AVX512BatchProcessor::AVX512BatchProcessor(Secp256K1 *secp) {
-    this->secp = secp;
-    this->avx512Available = false;
-    this->enabled = false;
-    
-    printf("[AVX512] ⚠️  AVX-512 не скомпилирован\n");
-    printf("[AVX512] Для включения: make CXXFLAGS=\"-mavx512f ...\" all\n");
-}
-
-AVX512BatchProcessor::~AVX512BatchProcessor() {}
-
-void AVX512BatchProcessor::Enable(bool enable) {
-    printf("[AVX512] AVX-512 не доступен в этой сборке\n");
-}
-
-int AVX512BatchProcessor::ProcessBatch(Int baseKey,
-                                        const std::vector<std::string> &targetPrefixes,
-                                        std::vector<Int> &foundKeys) {
-    return ProcessBatchStandard(baseKey, targetPrefixes, foundKeys);
-}
-
-void AVX512BatchProcessor::ResetStats() {}
-void AVX512BatchProcessor::PrintStats() const {}
-
-#endif // __AVX512F__
-
