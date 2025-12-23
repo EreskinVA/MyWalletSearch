@@ -221,6 +221,11 @@ private:
 
 #if defined(__x86_64__) || defined(__i386__)
 
+// We rely on compiler-provided intrinsics for _addcarry_u64/_subborrow_u64.
+// Important: do NOT #define _addcarry_u64/_subborrow_u64 here, иначе это ломает
+// заголовки GCC/Clang (adxintrin.h), которые объявляют одноимённые inline-функции.
+#include <immintrin.h>
+
 // Missing intrinsics (x86/x64)
 static uint64_t inline _umul128(uint64_t a, uint64_t b, uint64_t *h) {
   uint64_t rhi;
@@ -255,9 +260,6 @@ static uint64_t inline __rdtsc() {
 
 #define __shiftright128(a,b,n) ((a)>>(n))|((b)<<(64-(n)))
 #define __shiftleft128(a,b,n) ((b)<<(n))|((a)>>(64-(n)))
-
-#define _subborrow_u64(a,b,c,d) __builtin_ia32_sbb_u64(a,b,c,(long long unsigned int*)d);
-#define _addcarry_u64(a,b,c,d) __builtin_ia32_addcarryx_u64(a,b,c,(long long unsigned int*)d);
 
 #else
 
