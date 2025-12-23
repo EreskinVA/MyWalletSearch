@@ -18,6 +18,11 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+
+#ifdef _MSC_VER
+#include "stdafx.h"
+#endif
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>

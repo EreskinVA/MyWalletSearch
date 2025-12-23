@@ -3,6 +3,10 @@
  * Based on "Monte Carlo Methods for Index Computation (mod p)" by J.M. Pollard
  */
 
+#ifdef _MSC_VER
+#include "stdafx.h"
+#endif
+
 #ifdef _WIN32
 #define _USE_MATH_DEFINES
 #endif

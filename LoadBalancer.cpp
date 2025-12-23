@@ -3,6 +3,10 @@
  * Реализация динамической балансировки
  */
 
+#ifdef _MSC_VER
+#include "stdafx.h"
+#endif
+
 #include "LoadBalancer.h"
 #include <iostream>
 #include <algorithm>

@@ -2,6 +2,10 @@
  * Adaptive Priority Manager Implementation
  */
 
+#ifdef _MSC_VER
+#include "stdafx.h"
+#endif
+
 #include "AdaptivePriority.h"
 #include <algorithm>
 #include <cmath>

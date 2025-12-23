@@ -3,6 +3,10 @@
  * Реализация сохранения и восстановления прогресса
  */
 
+#ifdef _MSC_VER
+#include "stdafx.h"
+#endif
+
 #include "ProgressManager.h"
 #include <fstream>
 #include <sstream>

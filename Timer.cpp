@@ -15,6 +15,10 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifdef _MSC_VER
+#include "stdafx.h"
+#endif
+
 #include "Timer.h"
 
 static const char *prefix[] = { "","Kilo","Mega","Giga","Tera","Peta","Hexa" };
