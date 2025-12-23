@@ -15,6 +15,9 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
+// CRITICAL: Include precompiled header FIRST
+#include "stdafx.h"
+
 #include "SECP256k1.h"
 #include "hash/sha256.h"
 #include "hash/ripemd160.h"

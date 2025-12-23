@@ -227,7 +227,16 @@ private:
 // We rely on compiler-provided intrinsics for _addcarry_u64/_subborrow_u64.
 // Important: do NOT #define _addcarry_u64/_subborrow_u64 here, иначе это ломает
 // заголовки GCC/Clang (adxintrin.h), которые объявляют одноимённые inline-функции.
+// WindowsCompat.h should already be included at the top of this file
+#ifdef _WIN32
+#pragma warning(push)
+#pragma warning(disable: 4005) // macro redefinition
+#pragma warning(disable: 4091) // typedef ignored
+#endif
 #include <immintrin.h>
+#ifdef _WIN32
+#pragma warning(pop)
+#endif
 
 // ------------------------------------------------------------------
 // Unified wrappers: always accept uint64_t* out-params.

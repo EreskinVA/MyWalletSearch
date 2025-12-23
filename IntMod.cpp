@@ -15,6 +15,9 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
+// CRITICAL: Include precompiled header FIRST
+#include "stdafx.h"
+
 #include "Int.h"
 #if defined(__x86_64__) || defined(__i386__) || defined(_M_X64)
 #include <emmintrin.h>

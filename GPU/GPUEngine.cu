@@ -15,10 +15,10 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-// CRITICAL: Include Windows compatibility header FIRST, before any CUDA headers
+// CRITICAL: Include precompiled header FIRST, before any CUDA headers
 // CUDA headers automatically include Windows headers, which will cause conflicts
 // if NOMINMAX and WIN32_LEAN_AND_MEAN are not defined first
-#include "../WindowsCompat.h"
+#include "../stdafx.h"
 
 #ifndef WIN64
 #include <unistd.h>

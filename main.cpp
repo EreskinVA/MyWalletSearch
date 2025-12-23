@@ -15,8 +15,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-// CRITICAL: Include Windows compatibility header FIRST
-#include "WindowsCompat.h"
+// CRITICAL: Include precompiled header FIRST
+#include "stdafx.h"
 
 #include "Timer.h"
 #include "Vanity.h"

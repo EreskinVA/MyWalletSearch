@@ -15,6 +15,9 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
+// CRITICAL: Include precompiled header FIRST
+#include "stdafx.h"
+
 #include "Random.h"
 
 #define  RK_STATE_LEN 624

@@ -7,9 +7,20 @@
 #ifndef AVX512H
 #define AVX512H
 
+// CRITICAL: Include Windows compatibility header FIRST
+#include "WindowsCompat.h"
+
 #include "Int.h"
 #include "Point.h"
+#ifdef _WIN32
+#pragma warning(push)
+#pragma warning(disable: 4005) // macro redefinition
+#pragma warning(disable: 4091) // typedef ignored
+#endif
 #include <immintrin.h>
+#ifdef _WIN32
+#pragma warning(pop)
+#endif
 #include <stdint.h>
 #include <cstdint>
 

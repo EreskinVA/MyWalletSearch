@@ -13,15 +13,23 @@
 
 // Windows-specific definitions must come BEFORE any Windows headers
 #ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
+// Force these macros to be defined BEFORE any Windows headers are included
+// Use #undef first to clear any previous definitions
+#undef NOMINMAX
+#undef WIN32_LEAN_AND_MEAN
+#undef STRICT
+
+// Now define them
+#define NOMINMAX 1
+#define WIN32_LEAN_AND_MEAN 1
+#define STRICT 1
+
+// Prevent min/max macro definitions
+#ifdef min
+#undef min
 #endif
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-// Prevent conflicts with Windows SDK definitions
-#ifndef STRICT
-#define STRICT
+#ifdef max
+#undef max
 #endif
 #endif
 
