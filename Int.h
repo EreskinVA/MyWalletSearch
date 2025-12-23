@@ -367,7 +367,12 @@ static inline unsigned char subborrow_u64_u64p(unsigned char c, uint64_t a, uint
 // NOMINMAX and WIN32_LEAN_AND_MEAN should already be defined at the top of the file
 // We must include intrin.h to get the intrinsics, but this will pull in winnt.h
 // The key is to ensure NOMINMAX and WIN32_LEAN_AND_MEAN are defined FIRST
+// Suppress warnings about macro redefinitions in Windows SDK headers
+#pragma warning(push)
+#pragma warning(disable: 4005) // macro redefinition
+#pragma warning(disable: 4091) // typedef ignored
 #include <intrin.h>
+#pragma warning(pop)
 
 // Define our helper macros
 #define TZC(x) _tzcnt_u64(x)
