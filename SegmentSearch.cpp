@@ -3,9 +3,7 @@
  * Реализация сегментированного поиска
  */
 
-#ifdef _MSC_VER
 #include "stdafx.h"
-#endif
 
 #include "SegmentSearch.h"
 #include <fstream>

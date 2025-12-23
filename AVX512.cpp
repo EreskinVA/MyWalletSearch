@@ -3,9 +3,7 @@
  * Параллельная обработка 8 ключей
  */
 
-#ifdef _MSC_VER
 #include "stdafx.h"
-#endif
 
 #include "AVX512.h"
 #include <stdio.h>

@@ -19,9 +19,7 @@
  * THE SOFTWARE.
  */
 
-#ifdef _MSC_VER
 #include "stdafx.h"
-#endif
 
 #include <stdlib.h>
 #include <stdint.h>

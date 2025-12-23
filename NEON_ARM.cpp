@@ -3,9 +3,7 @@
  * Оптимизации для Apple Silicon M1/M2/M3
  */
 
-#ifdef _MSC_VER
 #include "stdafx.h"
-#endif
 
 #include "NEON_ARM.h"
 #include "hash/sha256.h"

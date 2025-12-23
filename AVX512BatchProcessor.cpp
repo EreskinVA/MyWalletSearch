@@ -2,9 +2,7 @@
  * AVX-512 Batch Processor Implementation
  */
 
-#ifdef _MSC_VER
 #include "stdafx.h"
-#endif
 
 #include "AVX512BatchProcessor.h"
 #include <stdio.h>
