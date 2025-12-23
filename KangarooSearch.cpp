@@ -45,7 +45,9 @@ void KangarooSearch::Initialize(const Int &start, const Int &end, const Point &t
   
   // Оптимальные параметры на основе размера диапазона
   // Jump distance ~ sqrt(rangeSize) / 256
-  double rangeBits = log2(rangeSize.ToDouble());
+  Int tempSize;
+  tempSize.Set((Int*)&rangeSize);
+  double rangeBits = log2(tempSize.ToDouble());
   jumpDistanceBits = (int)(rangeBits / 2.0) - 8;
   if (jumpDistanceBits < 8) jumpDistanceBits = 8;
   if (jumpDistanceBits > 32) jumpDistanceBits = 32;
@@ -371,7 +373,9 @@ void KangarooSearch::PrintStatistics() const {
     printf("Средняя скорость:   %.2f MKey/s\n", mkeysPerSec);
   }
   
-  double expected = sqrt(rangeSize.ToDouble()) * sqrt(M_PI / 2.0);
+  Int tempSize;
+  tempSize.Set((Int*)&rangeSize);
+  double expected = sqrt(tempSize.ToDouble()) * sqrt(M_PI / 2.0);
   double efficiency = (totalJumps / expected) * 100.0;
   printf("Эффективность:      %.2f%% от теоретической\n", efficiency);
   
@@ -431,10 +435,14 @@ bool KangarooSearch::SaveState(const std::string &filename) {
   file << "DPCount=" << distinguishedPoints.size() << "\n";
   for (const auto &pair : distinguishedPoints) {
     const DistinguishedPoint &dp = pair.second;
+    Int tmpX, tmpY, tmpDist;
+    tmpX.Set((Int*)&dp.position.x);
+    tmpY.Set((Int*)&dp.position.y);
+    tmpDist.Set((Int*)&dp.distance);
     file << "DP_Hash=" << dp.dpHash << "\n";
-    file << "DP_PosX=" << dp.position.x.GetBase16() << "\n";
-    file << "DP_PosY=" << dp.position.y.GetBase16() << "\n";
-    file << "DP_Dist=" << dp.distance.GetBase16() << "\n";
+    file << "DP_PosX=" << tmpX.GetBase16() << "\n";
+    file << "DP_PosY=" << tmpY.GetBase16() << "\n";
+    file << "DP_Dist=" << tmpDist.GetBase16() << "\n";
     file << "DP_Tame=" << (dp.isTame ? "1" : "0") << "\n";
   }
   
