@@ -293,21 +293,26 @@ double SegmentSearch::GetOverallProgress() {
     
     // Вычислить прогресс в текущем сегменте
     Int segSize;
-    if (seg.rangeEnd.IsGreater(&seg.rangeStart)) {
-      segSize.Set(&seg.rangeEnd);
-      segSize.Sub(&seg.rangeStart);
+    Int temp1, temp2, temp3;
+    temp1.Set((Int*)&seg.rangeEnd);
+    temp2.Set((Int*)&seg.rangeStart);
+    temp3.Set((Int*)&seg.currentKey);
+    
+    if (seg.rangeEnd.IsGreater((Int*)&seg.rangeStart)) {
+      segSize.Set(&temp1);
+      segSize.Sub(&temp2);
     } else {
-      segSize.Set(&seg.rangeStart);
-      segSize.Sub(&seg.rangeEnd);
+      segSize.Set(&temp2);
+      segSize.Sub(&temp1);
     }
     
     Int progress;
     if (seg.direction == DIRECTION_UP) {
-      progress.Set(&seg.currentKey);
-      progress.Sub(&seg.rangeStart);
+      progress.Set(&temp3);
+      progress.Sub(&temp2);
     } else {
-      progress.Set(&seg.rangeEnd);
-      progress.Sub(&seg.currentKey);
+      progress.Set(&temp1);
+      progress.Sub(&temp3);
     }
     
     double segProgress = 0.0;
