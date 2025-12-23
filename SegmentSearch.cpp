@@ -301,7 +301,7 @@ double SegmentSearch::GetOverallProgress() {
     temp2.Set((Int*)&seg.rangeStart);
     temp3.Set((Int*)&seg.currentKey);
     
-    if (seg.rangeEnd.IsGreater((Int*)&seg.rangeStart)) {
+    if (temp1.IsGreater(&temp2)) {
       segSize.Set(&temp1);
       segSize.Sub(&temp2);
     } else {
