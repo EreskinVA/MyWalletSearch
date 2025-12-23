@@ -20,6 +20,20 @@
 #ifndef BIGINTH
 #define BIGINTH
 
+// Windows-specific definitions must come BEFORE any Windows headers
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+// Prevent conflicts with Windows SDK definitions
+#ifndef STRICT
+#define STRICT
+#endif
+#endif
+
 #include "Random.h"
 #include <string>
 #include <inttypes.h>
@@ -211,7 +225,7 @@ private:
 
 // Inline routines
 
-#if !defined(WIN64)
+#if !defined(_WIN32) && !defined(_WIN64) && !defined(WIN32) && !defined(WIN64)
 
 // ------------------------------------------------------------------
 // Intrinsics / helpers for non-Windows builds.
@@ -350,8 +364,12 @@ static inline unsigned char subborrow_u64_u64p(unsigned char c, uint64_t a, uint
 #else
 
 // Windows/MSVC
-// Include intrin.h - it provides intrinsics without pulling in all of Windows.h
+// NOMINMAX and WIN32_LEAN_AND_MEAN should already be defined at the top of the file
+// We must include intrin.h to get the intrinsics, but this will pull in winnt.h
+// The key is to ensure NOMINMAX and WIN32_LEAN_AND_MEAN are defined FIRST
 #include <intrin.h>
+
+// Define our helper macros
 #define TZC(x) _tzcnt_u64(x)
 #define LZC(x) _lzcnt_u64(x)
 
@@ -371,11 +389,11 @@ static inline unsigned char subborrow_u64_u64p(unsigned char c, uint64_t a, uint
                         (unsigned long long *)out);
 }
 
-// MSVC has _umul128 built-in
-// _umul128 is already available in <intrin.h>
+// MSVC has _umul128 built-in as an intrinsic
+// _umul128 is already declared above - do NOT redefine it!
 
-// MSVC has _mul128 built-in
-// _mul128 is already available in <intrin.h>
+// MSVC has _mul128 built-in as an intrinsic
+// _mul128 is already declared above - do NOT redefine it!
 
 // MSVC has _udiv128 built-in (available in Visual Studio 2019 16.8+)
 // _udiv128 is an intrinsic function, not a regular function
@@ -383,6 +401,7 @@ static inline unsigned char subborrow_u64_u64p(unsigned char c, uint64_t a, uint
 // If your MSVC version doesn't have it, you'll need to upgrade or use a workaround
 
 // Use Windows SDK definitions if available, otherwise define our own
+// These macros are used in shift operations and should not conflict
 #ifndef __shiftright128
 #define __shiftright128(a,b,n) ((a)>>(n))|((b)<<(64-(n)))
 #endif

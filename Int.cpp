@@ -22,6 +22,12 @@
 #if defined(__x86_64__) || defined(__i386__) || defined(_M_X64)
 #include <emmintrin.h>
 #endif
+#ifdef _WIN32
+// Include intrin.h in .cpp file to provide intrinsics implementation
+// This avoids including it in the header file which would pull in winnt.h
+// and cause conflicts
+#include <intrin.h>
+#endif
 #include "Timer.h"
 
 #define MAX(x,y) (((x)>(y))?(x):(y))
