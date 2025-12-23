@@ -153,20 +153,25 @@ Point KangarooSearch::ComputeJump(const Point &position, Int &jumpDist) {
   // Вычислить следующую позицию после прыжка
   
   unsigned char hash[32];
-  sha256(position.x.bits64, 32, hash);
+  Int tempX;
+  tempX.Set((Int*)&position.x);
+  sha256((uint8_t*)tempX.bits64, 32, hash);
   
   int index = hash[0];
   jumpDist.Set(&jumpDistances[index]);
   
   // position + jumpTable[index]
-  return secp->AddDirect(position, jumpTable[index]);
+  Point tempPos = position;
+  return secp->AddDirect(tempPos, jumpTable[index]);
 }
 
 bool KangarooSearch::IsDistinguished(const Point &p) {
   // Точка distinguished если последние N бит её хеша = 0
   
   unsigned char hash[32];
-  sha256(p.x.bits64, 32, hash);
+  Int tempX;
+  tempX.Set((Int*)&p.x);
+  sha256((uint8_t*)tempX.bits64, 32, hash);
   
   // Проверяем последние биты
   uint32_t check = *(uint32_t*)hash;
