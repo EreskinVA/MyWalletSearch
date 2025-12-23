@@ -531,8 +531,8 @@ void GPUEngine::SetPrefix(std::vector<LPREFIX> prefixes, uint32_t totalPrefix) {
   lostWarning = false;
 
   cudaError_t last = cudaGetLastError();
-  cudaError_t err = (err1 != cudaSuccess) ? err1 : ((err2 != cudaSuccess) ? err2 : last);
-  if (err != cudaSuccess) printf("GPUEngine: SetPrefix (large): %s\n", cudaGetErrorString(err));
+  cudaError_t copyErr = (err1 != cudaSuccess) ? err1 : ((err2 != cudaSuccess) ? err2 : last);
+  if (copyErr != cudaSuccess) printf("GPUEngine: SetPrefix (large): %s\n", cudaGetErrorString(copyErr));
 
 }
 
