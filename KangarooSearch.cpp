@@ -178,7 +178,9 @@ bool KangarooSearch::IsDistinguished(const Point &p) {
 std::string KangarooSearch::ComputeDistinguishedHash(const Point &p) {
   // Уникальный хеш для distinguished point
   unsigned char hash[32];
-  sha256(p.x.bits64, 32, hash);
+  Int tempX;
+  tempX.Set((Int*)&p.x);
+  sha256((uint8_t*)tempX.bits64, 32, hash);
   
   char hex[65];
   for (int i = 0; i < 32; i++) {
@@ -236,10 +238,11 @@ bool KangarooSearch::CheckCollision(const DistinguishedPoint &dp, Int &privateKe
   
   // COLLISION! Восстанавливаем приватный ключ
   printf("\n[Kangaroo] 🎉 COLLISION DETECTED!\n");
-  printf("[Kangaroo] Tame distance: %s\n", 
-         (storedDP.isTame ? storedDP.distance : dp.distance).GetBase16().c_str());
-  printf("[Kangaroo] Wild distance: %s\n",
-         (!storedDP.isTame ? storedDP.distance : dp.distance).GetBase16().c_str());
+  Int tempDist1, tempDist2;
+  tempDist1.Set((Int*)(storedDP.isTame ? &storedDP.distance : &dp.distance));
+  tempDist2.Set((Int*)(!storedDP.isTame ? &storedDP.distance : &dp.distance));
+  printf("[Kangaroo] Tame distance: %s\n", tempDist1.GetBase16().c_str());
+  printf("[Kangaroo] Wild distance: %s\n", tempDist2.GetBase16().c_str());
   
   privateKey = ReconstructPrivateKey(
     storedDP.isTame ? storedDP : dp,
