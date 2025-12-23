@@ -41,7 +41,8 @@ Point _2Gn;
 VanitySearch::VanitySearch(Secp256K1 *secp, vector<std::string> &inputPrefixes,string seed,int searchMode,
                            bool useGpu, bool stop, string outputFile, bool useSSE, uint32_t maxFound,
                            uint64_t rekey, bool caseSensitive, Point &startPubKey, bool paranoiacSeed,
-                           bool useSegments, string segmentFile, int bitRange)
+                           bool useSegments, string segmentFile, int bitRange,
+                           string progressFile, bool resumeProgress, int autoSaveInterval)
   :inputPrefixes(inputPrefixes) {
 
   this->secp = secp;
@@ -64,7 +65,20 @@ VanitySearch::VanitySearch(Secp256K1 *secp, vector<std::string> &inputPrefixes,s
   // Initialize segment search if requested
   if (useSegmentSearch) {
     segmentSearch = new SegmentSearch();
-    if (!segmentFile.empty()) {
+    
+    // Try to resume from progress file
+    if (resumeProgress && !progressFile.empty()) {
+      string targetAddr = inputPrefixes.empty() ? "" : inputPrefixes[0];
+      if (segmentSearch->LoadProgress(targetAddr)) {
+        printf("[VanitySearch] Прогресс восстановлен, продолжаем поиск\n");
+      } else {
+        printf("[VanitySearch] Не удалось восстановить прогресс, начинаем сначала\n");
+        resumeProgress = false;
+      }
+    }
+    
+    // Load segment configuration if not resuming or if resume failed
+    if (!resumeProgress && !segmentFile.empty()) {
       if (segmentSearch->LoadSegmentsFromFile(segmentFile)) {
         if (bitRange > 0) {
           segmentSearch->InitializeSegments(bitRange);
@@ -76,6 +90,11 @@ VanitySearch::VanitySearch(Secp256K1 *secp, vector<std::string> &inputPrefixes,s
         segmentSearch = NULL;
         this->useSegmentSearch = false;
       }
+    }
+    
+    // Enable progress saving if requested
+    if (!progressFile.empty() && segmentSearch != NULL) {
+      segmentSearch->EnableProgressSaving(progressFile, autoSaveInterval);
     }
   }
 

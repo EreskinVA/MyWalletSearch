@@ -1,0 +1,13 @@
+# Автоматически сгенерированная конфигурация сегментов
+# Оптимизирована для Puzzle 71
+# Сгенерировано: statistical_optimizer.py
+#
+# Формат: startPercent endPercent direction [name]
+#
+
+48.00 54.00 up    central_up
+56.00 54.00 down  central_down
+52.00 54.50 up    hotspot_53
+49.50 51.50 up    hotspot_50
+45.00 48.00 up    extended_low
+56.00 59.00 up    extended_high

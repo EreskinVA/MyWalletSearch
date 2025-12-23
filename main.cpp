@@ -65,6 +65,9 @@ void printUsage() {
   printf(" -r rekey: Rekey interval in MegaKey, default is disabled\n");
   printf(" -seg segmentfile: Use segment search from config file (e.g., segments_puzzle71.txt)\n");
   printf(" -bits bitrange: Bit range for segment search (e.g., 71 for puzzle 71)\n");
+  printf(" -progress file: Enable progress saving to file (auto-save every 5 min)\n");
+  printf(" -resume: Resume from saved progress file\n");
+  printf(" -autosave interval: Auto-save interval in seconds (default: 300)\n");
   exit(0);
 
 }
@@ -406,6 +409,9 @@ int main(int argc, char* argv[]) {
   bool useSegments = false;
   string segmentFile = "";
   int bitRange = 0;
+  string progressFile = "";
+  bool resumeProgress = false;
+  int autoSaveInterval = 300;
 
   while (a < argc) {
 
@@ -545,6 +551,17 @@ int main(int argc, char* argv[]) {
       a++;
       bitRange = getInt("bitRange", argv[a]);
       a++;
+    } else if (strcmp(argv[a], "-progress") == 0) {
+      a++;
+      progressFile = string(argv[a]);
+      a++;
+    } else if (strcmp(argv[a], "-resume") == 0) {
+      resumeProgress = true;
+      a++;
+    } else if (strcmp(argv[a], "-autosave") == 0) {
+      a++;
+      autoSaveInterval = getInt("autoSaveInterval", argv[a]);
+      a++;
     } else if (strcmp(argv[a], "-h") == 0) {
       printUsage();
     } else if (a == argc - 1) {
@@ -594,12 +611,25 @@ int main(int argc, char* argv[]) {
     printf("\n=== Segment Search Mode ===\n");
     printf("Config file: %s\n", segmentFile.c_str());
     printf("Bit range: %d\n", bitRange);
+    
+    if (!progressFile.empty()) {
+      printf("Progress file: %s\n", progressFile.c_str());
+      printf("Auto-save interval: %d sec\n", autoSaveInterval);
+    }
+    if (resumeProgress) {
+      printf("Resume mode: ENABLED\n");
+    }
     printf("==========================\n\n");
+  }
+  
+  // Validate progress parameters
+  if (resumeProgress && progressFile.empty()) {
+    progressFile = "vanitysearch_progress.dat";  // Default progress file
   }
 
   VanitySearch *v = new VanitySearch(secp, prefix, seed, searchMode, gpuEnable, stop, outputFile, sse,
     maxFound, rekey, caseSensitive, startPuKey, paranoiacSeed, 
-    useSegments, segmentFile, bitRange);
+    useSegments, segmentFile, bitRange, progressFile, resumeProgress, autoSaveInterval);
   v->Search(nbCPUThread,gpuId,gridSize);
 
   return 0;

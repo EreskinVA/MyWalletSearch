@@ -7,6 +7,8 @@
 #define SEGMENTSEARCHH
 
 #include "Int.h"
+#include "ProgressManager.h"
+#include "LoadBalancer.h"
 #include <vector>
 #include <string>
 
@@ -61,6 +63,18 @@ public:
   
   // Получить общий прогресс поиска
   double GetOverallProgress();
+  
+  // Управление прогрессом
+  void EnableProgressSaving(const std::string &progressFile, int autoSaveInterval = 300);
+  bool SaveProgress(const std::string &targetAddress);
+  bool LoadProgress(const std::string &targetAddress);
+  void UpdateProgress(int threadId, uint64_t keysChecked);
+  bool ShouldAutoSave();
+  
+  // Балансировка нагрузки
+  void EnableLoadBalancing(int numThreads, int rebalanceInterval = 60);
+  void UpdateLoadStats(int threadId, uint64_t keysChecked, double keysPerSecond);
+  bool PerformRebalance();
 
 private:
   std::vector<SearchSegment> segments;
@@ -70,11 +84,25 @@ private:
   Int fullRangeSize;     // Размер полного диапазона
   int activeSegments;
   
+  // Progress management
+  ProgressManager *progressManager;
+  SearchProgress currentProgress;
+  bool progressSavingEnabled;
+  uint64_t keysCheckedSinceLastSave;
+  
+  // Load balancing
+  LoadBalancer *loadBalancer;
+  bool loadBalancingEnabled;
+  
   // Вычислить ключ для заданного процента
   void CalculateKeyAtPercent(double percent, Int &result);
   
-  // Распределить сегменты между потоками
+  // Распределить сегменты между потоками (с учётом балансировки)
   int GetSegmentForThread(int threadId);
+  
+  // Конвертация между SegmentProgress и SearchSegment
+  void ExportToProgress();
+  void ImportFromProgress();
 };
 
 #endif // SEGMENTSEARCHH

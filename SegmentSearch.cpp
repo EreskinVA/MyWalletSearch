@@ -12,10 +12,23 @@
 SegmentSearch::SegmentSearch() {
   bitRange = 0;
   activeSegments = 0;
+  progressManager = NULL;
+  progressSavingEnabled = false;
+  keysCheckedSinceLastSave = 0;
+  loadBalancer = NULL;
+  loadBalancingEnabled = false;
 }
 
 SegmentSearch::~SegmentSearch() {
   segments.clear();
+  if (progressManager != NULL) {
+    delete progressManager;
+    progressManager = NULL;
+  }
+  if (loadBalancer != NULL) {
+    delete loadBalancer;
+    loadBalancer = NULL;
+  }
 }
 
 void SegmentSearch::AddSegment(double startPercent, double endPercent, 
@@ -164,6 +177,11 @@ void SegmentSearch::InitializeSegments(int bits) {
 int SegmentSearch::GetSegmentForThread(int threadId) {
   if (segments.empty()) return -1;
   
+  // Использовать балансировщик, если включен
+  if (loadBalancingEnabled && loadBalancer != NULL) {
+    return loadBalancer->GetSegmentForThread(threadId);
+  }
+  
   // Простое распределение: round-robin по активным сегментам
   int activeCount = 0;
   for (size_t i = 0; i < segments.size(); i++) {
@@ -295,5 +313,172 @@ double SegmentSearch::GetOverallProgress() {
   }
   
   return totalProgress / segments.size();
+}
+
+void SegmentSearch::EnableProgressSaving(const std::string &progressFile, int autoSaveInterval) {
+  if (progressManager == NULL) {
+    progressManager = new ProgressManager();
+  }
+  
+  progressManager->SetProgressFile(progressFile);
+  progressManager->EnableAutoSave(autoSaveInterval);
+  progressSavingEnabled = true;
+  
+  printf("[SegmentSearch] Сохранение прогресса включено: %s\n", progressFile.c_str());
+}
+
+bool SegmentSearch::SaveProgress(const std::string &targetAddress) {
+  if (!progressSavingEnabled || progressManager == NULL) {
+    return false;
+  }
+  
+  ExportToProgress();
+  currentProgress.targetAddress = targetAddress;
+  currentProgress.lastSaveTime = time(NULL);
+  
+  bool result = progressManager->SaveProgress(currentProgress);
+  if (result) {
+    progressManager->MarkSaved();
+    keysCheckedSinceLastSave = 0;
+  }
+  
+  return result;
+}
+
+bool SegmentSearch::LoadProgress(const std::string &targetAddress) {
+  if (progressManager == NULL) {
+    progressManager = new ProgressManager();
+  }
+  
+  if (!progressManager->ProgressFileExists()) {
+    printf("[SegmentSearch] Файл прогресса не найден, начинаем с нуля\n");
+    return false;
+  }
+  
+  if (!progressManager->LoadProgress(currentProgress)) {
+    return false;
+  }
+  
+  // Проверка соответствия адреса
+  if (!targetAddress.empty() && currentProgress.targetAddress != targetAddress) {
+    printf("[SegmentSearch] Предупреждение: целевой адрес не совпадает\n");
+    printf("  В файле: %s\n", currentProgress.targetAddress.c_str());
+    printf("  Запрошен: %s\n", targetAddress.c_str());
+    printf("  Игнорируем файл прогресса\n");
+    return false;
+  }
+  
+  // Проверка битового диапазона
+  if (currentProgress.bitRange != bitRange) {
+    printf("[SegmentSearch] Предупреждение: битовый диапазон не совпадает (%d vs %d)\n",
+           currentProgress.bitRange, bitRange);
+    return false;
+  }
+  
+  // Импорт сегментов из прогресса
+  ImportFromProgress();
+  
+  printf("[SegmentSearch] ✓ Прогресс восстановлен успешно\n");
+  printf("%s", progressManager->GetProgressStats(currentProgress).c_str());
+  
+  return true;
+}
+
+void SegmentSearch::UpdateProgress(int threadId, uint64_t keysChecked) {
+  if (!progressSavingEnabled) return;
+  
+  int segIdx = GetSegmentForThread(threadId);
+  if (segIdx >= 0 && segIdx < (int)segments.size()) {
+    ProgressManager::UpdateSegmentProgress(currentProgress, segIdx, 
+                                            segments[segIdx].currentKey, keysChecked);
+    keysCheckedSinceLastSave += keysChecked;
+    
+    // Автосохранение
+    if (ShouldAutoSave()) {
+      SaveProgress(currentProgress.targetAddress);
+    }
+  }
+}
+
+bool SegmentSearch::ShouldAutoSave() {
+  if (!progressSavingEnabled || progressManager == NULL) {
+    return false;
+  }
+  
+  return progressManager->ShouldSave();
+}
+
+void SegmentSearch::ExportToProgress() {
+  currentProgress.bitRange = bitRange;
+  currentProgress.segments.clear();
+  
+  for (size_t i = 0; i < segments.size(); i++) {
+    SegmentProgress sp;
+    sp.name = segments[i].name;
+    sp.startPercent = segments[i].startPercent;
+    sp.endPercent = segments[i].endPercent;
+    sp.direction = (segments[i].direction == DIRECTION_UP) ? 0 : 1;
+    sp.currentKey = segments[i].currentKey.GetBase16();
+    sp.active = segments[i].active;
+    sp.keysChecked = 0;  // Будет обновлено при UpdateProgress
+    sp.lastUpdate = time(NULL);
+    
+    currentProgress.segments.push_back(sp);
+  }
+}
+
+void SegmentSearch::ImportFromProgress() {
+  if (currentProgress.segments.size() != segments.size()) {
+    printf("[SegmentSearch] Предупреждение: количество сегментов не совпадает\n");
+    return;
+  }
+  
+  for (size_t i = 0; i < segments.size() && i < currentProgress.segments.size(); i++) {
+    const SegmentProgress &sp = currentProgress.segments[i];
+    
+    // Восстанавливаем текущий ключ
+    segments[i].currentKey.SetBase16((char *)sp.currentKey.c_str());
+    segments[i].active = sp.active;
+    
+    printf("[SegmentSearch] Восстановлен сегмент %s: %llu ключей проверено\n",
+           sp.name.c_str(), (unsigned long long)sp.keysChecked);
+  }
+}
+
+void SegmentSearch::EnableLoadBalancing(int numThreads, int rebalanceInterval) {
+  if (loadBalancer == NULL) {
+    loadBalancer = new LoadBalancer();
+  }
+  
+  loadBalancer->Initialize(segments.size(), numThreads);
+  loadBalancer->SetRebalanceInterval(rebalanceInterval);
+  loadBalancer->EnableAdaptiveBalancing(true);
+  loadBalancingEnabled = true;
+  
+  printf("[SegmentSearch] Балансировка нагрузки включена\n");
+}
+
+void SegmentSearch::UpdateLoadStats(int threadId, uint64_t keysChecked, double keysPerSecond) {
+  if (!loadBalancingEnabled || loadBalancer == NULL) return;
+  
+  int segId = GetSegmentForThread(threadId);
+  if (segId >= 0 && segId < (int)segments.size()) {
+    loadBalancer->UpdateSegmentStats(segId, keysChecked, keysPerSecond);
+  }
+}
+
+bool SegmentSearch::PerformRebalance() {
+  if (!loadBalancingEnabled || loadBalancer == NULL) {
+    return false;
+  }
+  
+  // Обновить статус завершённых сегментов
+  for (size_t i = 0; i < segments.size(); i++) {
+    if (!segments[i].active) {
+      loadBalancer->MarkSegmentCompleted(i);
+    }
+  }
+  
+  return loadBalancer->Rebalance();
 }
 
