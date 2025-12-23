@@ -1,15 +1,22 @@
 #---------------------------------------------------------------------
-# Makefile for VanitySearch
+# Makefile для VanitySearch с AVX-512 поддержкой
 #
-# Author : Jean-Luc PONS
+# Использование:
+#   make -f Makefile.avx512 all
+#   make -f Makefile.avx512 gpu=1 CCAP=7.5 all
+#
+# Требует CPU с поддержкой AVX-512F:
+#   - Intel: Skylake-X, Ice Lake, Tiger Lake, Sapphire Rapids
+#   - AMD: Zen 4 (Ryzen 7000+)
+#
 
 SRC = Base58.cpp IntGroup.cpp main.cpp Random.cpp \
       Timer.cpp Int.cpp IntMod.cpp Point.cpp SECP256K1.cpp \
       Vanity.cpp GPU/GPUGenerate.cpp hash/ripemd160.cpp \
       hash/sha256.cpp hash/sha512.cpp hash/ripemd160_sse.cpp \
       hash/sha256_sse.cpp Bech32.cpp Wildcard.cpp SegmentSearch.cpp \
-      ProgressManager.cpp LoadBalancer.cpp AdaptivePriority.cpp KangarooSearch.cpp \
-      AVX512.cpp AVX512BatchProcessor.cpp
+      ProgressManager.cpp LoadBalancer.cpp AdaptivePriority.cpp \
+      KangarooSearch.cpp AVX512.cpp AVX512BatchProcessor.cpp
 
 OBJDIR = obj
 
@@ -21,8 +28,8 @@ OBJET = $(addprefix $(OBJDIR)/, \
         hash/ripemd160.o hash/sha256.o hash/sha512.o \
         hash/ripemd160_sse.o hash/sha256_sse.o \
         GPU/GPUEngine.o Bech32.o Wildcard.o SegmentSearch.o \
-        ProgressManager.o LoadBalancer.o AdaptivePriority.o KangarooSearch.o \
-        AVX512.o AVX512BatchProcessor.o)
+        ProgressManager.o LoadBalancer.o AdaptivePriority.o \
+        KangarooSearch.o AVX512.o AVX512BatchProcessor.o)
 
 else
 
@@ -40,25 +47,26 @@ CXX        = g++
 CUDA       = /usr/local/cuda-8.0
 CXXCUDA    = /usr/bin/g++-4.8
 NVCC       = $(CUDA)/bin/nvcc
-# nvcc requires joint notation w/o dot, i.e. "5.2" -> "52"
 ccap       = $(shell echo $(CCAP) | tr -d '.')
+
+# AVX-512 флаги компиляции
+AVX512FLAGS = -mavx512f -mavx512dq -mavx512bw -mavx512vl
 
 ifdef gpu
 ifdef debug
-CXXFLAGS   = -DWITHGPU -m64  -mssse3 -Wno-write-strings -g -I. -I$(CUDA)/include
+CXXFLAGS   = -DWITHGPU -DWITHAVX512 -m64 $(AVX512FLAGS) -Wno-write-strings -g -I. -I$(CUDA)/include
 else
-CXXFLAGS   =  -DWITHGPU -m64 -mssse3 -Wno-write-strings -O2 -I. -I$(CUDA)/include
+CXXFLAGS   = -DWITHGPU -DWITHAVX512 -m64 $(AVX512FLAGS) -Wno-write-strings -O3 -march=native -I. -I$(CUDA)/include
 endif
 LFLAGS     = -lpthread -L$(CUDA)/lib64 -lcudart
 else
 ifdef debug
-CXXFLAGS   = -m64 -mssse3 -Wno-write-strings -g -I. -I$(CUDA)/include
+CXXFLAGS   = -DWITHAVX512 -m64 $(AVX512FLAGS) -Wno-write-strings -g -I. -I$(CUDA)/include
 else
-CXXFLAGS   =  -m64 -mssse3 -Wno-write-strings -O2 -I. -I$(CUDA)/include
+CXXFLAGS   = -DWITHAVX512 -m64 $(AVX512FLAGS) -Wno-write-strings -O3 -march=native -I. -I$(CUDA)/include
 endif
 LFLAGS     = -lpthread
 endif
-
 
 #--------------------------------------------------------------------
 
@@ -78,8 +86,10 @@ $(OBJDIR)/%.o : %.cpp
 all: VanitySearch
 
 VanitySearch: $(OBJET)
-	@echo Making VanitySearch...
+	@echo Making VanitySearch with AVX-512...
 	$(CXX) $(OBJET) $(LFLAGS) -o VanitySearch
+	@echo "✅ VanitySearch-AVX512 скомпилирован!"
+	@echo "🚀 Для проверки поддержки: ./VanitySearch -v"
 
 $(OBJET): | $(OBJDIR) $(OBJDIR)/GPU $(OBJDIR)/hash
 
@@ -97,4 +107,13 @@ clean:
 	@rm -f obj/*.o
 	@rm -f obj/GPU/*.o
 	@rm -f obj/hash/*.o
+	@rm -f VanitySearch
+
+test-avx512:
+	@echo "=== Тест AVX-512 поддержки ==="
+	@grep -q avx512f /proc/cpuinfo && echo "✅ CPU поддерживает AVX-512" || echo "❌ CPU не поддерживает AVX-512"
+	@echo ""
+	@echo "Для сборки с AVX-512:"
+	@echo "  make -f Makefile.avx512 clean"
+	@echo "  make -f Makefile.avx512 all"
 
