@@ -18,6 +18,7 @@
 #include "Timer.h"
 #include "Vanity.h"
 #include "SECP256k1.h"
+#include "GPU/GPUEngine.h"
 #include <fstream>
 #include <string>
 #include <string.h>
@@ -69,6 +70,7 @@ void printUsage() {
   printf(" -resume: Resume from saved progress file\n");
   printf(" -autosave interval: Auto-save interval in seconds (default: 300)\n");
   printf(" -kangaroo: Use Pollard's Kangaroo algorithm (O(sqrt(N)), EXPERIMENTAL)\n");
+  printf(" -genGroup n: Regenerate GPU/GPUGroup.h with GRP_SIZE=n (useful to reduce GPU stack/memory)\n");
   exit(0);
 
 }
@@ -449,6 +451,18 @@ int main(int argc, char* argv[]) {
 #else
   printf("GPU code not compiled, use -DWITHGPU when compiling.\n");
 #endif
+      exit(0);
+    } else if (strcmp(argv[a], "-genGroup") == 0) {
+
+      a++;
+      int grpSize = getInt("genGroup", argv[a]);
+      if (grpSize < 64 || (grpSize % 2) != 0) {
+        printf("Invalid -genGroup value: must be even and >= 64\n");
+        exit(-1);
+      }
+      printf("Generating GPU/GPUGroup.h with GRP_SIZE=%d ...\n", grpSize);
+      GPUEngine::GenerateCode(secp, grpSize);
+      printf("Done. Now rebuild with: make clean && make gpu=1 ...\n");
       exit(0);
     } else if (strcmp(argv[a], "-l") == 0) {
 
