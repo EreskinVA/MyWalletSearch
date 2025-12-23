@@ -20,19 +20,8 @@
 #ifndef BIGINTH
 #define BIGINTH
 
-// Windows-specific definitions must come BEFORE any Windows headers
-#ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-// Prevent conflicts with Windows SDK definitions
-#ifndef STRICT
-#define STRICT
-#endif
-#endif
+// CRITICAL: Include Windows compatibility header FIRST
+#include "WindowsCompat.h"
 
 #include "Random.h"
 #include <string>

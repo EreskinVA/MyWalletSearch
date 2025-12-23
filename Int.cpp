@@ -15,6 +15,9 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
+// CRITICAL: Include Windows compatibility header FIRST
+#include "WindowsCompat.h"
+
 #include "Int.h"
 #include "IntGroup.h"
 #include <string.h>

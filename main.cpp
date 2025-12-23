@@ -15,15 +15,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-// Windows-specific definitions must come BEFORE any Windows headers
-#ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#endif
+// CRITICAL: Include Windows compatibility header FIRST
+#include "WindowsCompat.h"
 
 #include "Timer.h"
 #include "Vanity.h"

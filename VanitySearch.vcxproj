@@ -17,6 +17,7 @@
   <ItemGroup>
     <ClInclude Include="Base58.h" />
     <ClInclude Include="Bech32.h" />
+    <ClInclude Include="WindowsCompat.h" />
     <ClInclude Include="GPU\GPUBase58.h" />
     <ClInclude Include="GPU\GPUCompute.h" />
     <ClInclude Include="GPU\GPUEngine.h" />
