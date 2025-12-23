@@ -278,11 +278,11 @@ GPUEngine::GPUEngine(int nbThreadGroup, int nbThreadPerGroup, int gpuId, uint32_
   }
 
   // IMPORTANT: kernels in this project use large per-thread local arrays (e.g. dx[513][4] in GPUCompute),
-  // so running with a too-small device stack produces silent wrong results (and CPU/GPU check mismatches).
-  // We therefore require a minimum stack limit; if the driver refuses it (often due to memory pressure),
-  // we fail early and ask the user to lower grid size (-g) to reduce total stack allocation.
-  const size_t minRequiredStack = 20480; // conservative minimum for correctness (>= ~16KB local arrays + overhead)
-  size_t stackCandidates[] = {49152, 32768, 24576, 20480};
+  // so running with a too-small device stack produces wrong results. However, setting a *larger-than-needed*
+  // stack can also fail with cudaErrorMemoryAllocation on multi-tenant GPU servers.
+  // We therefore set a minimal safe stack first, and only fall back to smaller values if required.
+  const size_t minRequiredStack = 20480; // >= ~16KB local arrays + overhead
+  size_t stackCandidates[] = {20480, 16384};
   bool stackOk = false;
   size_t selectedStack = 0;
   for (size_t k = 0; k < sizeof(stackCandidates) / sizeof(stackCandidates[0]); k++) {
@@ -291,12 +291,15 @@ GPUEngine::GPUEngine(int nbThreadGroup, int nbThreadPerGroup, int gpuId, uint32_
     if (err == cudaSuccess) {
       stackOk = true;
       selectedStack = stackSize;
+      // Clear any stale "last error" state in case previous runtime calls failed.
+      (void)cudaGetLastError();
       break;
     }
     printf("GPUEngine: cudaDeviceSetLimit(stack=%zu) failed: %s\n", stackSize, cudaGetErrorString(err));
+    (void)cudaGetLastError();
   }
-  if (!stackOk) {
-    printf("GPUEngine: ERROR: unable to set cudaLimitStackSize >= %zu bytes.\n", minRequiredStack);
+  if (!stackOk || selectedStack < minRequiredStack) {
+    printf("GPUEngine: ERROR: unable to set cudaLimitStackSize to %zu bytes.\n", minRequiredStack);
     printf("GPUEngine: Hint: reduce grid size (-g) to reduce total stack allocation.\n");
     return;
   }
@@ -441,14 +444,16 @@ void GPUEngine::SetPrefix(std::vector<prefix_t> prefixes) {
     inputPrefixPinned[prefixes[i]]=1;
 
   // Fill device memory
-  cudaMemcpy(inputPrefix, inputPrefixPinned, _64K * 2, cudaMemcpyHostToDevice);
+  cudaError_t err = cudaMemcpy(inputPrefix, inputPrefixPinned, _64K * 2, cudaMemcpyHostToDevice);
 
   // We do not need the input pinned memory anymore
   FreeHostBuffer(inputPrefixPinned, inputPrefixPinnedCuda);
   inputPrefixPinned = NULL;
   lostWarning = false;
 
-  cudaError_t err = cudaGetLastError();
+  // Prefer reporting the memcpy error; also clear any stale last error.
+  cudaError_t last = cudaGetLastError();
+  if (err == cudaSuccess) err = last;
   if (err != cudaSuccess) {
     printf("GPUEngine: SetPrefix: %s\n", cudaGetErrorString(err));
   }
@@ -460,14 +465,15 @@ void GPUEngine::SetPattern(const char *pattern) {
   strcpy((char *)inputPrefixPinned,pattern);
 
   // Fill device memory
-  cudaMemcpy(inputPrefix, inputPrefixPinned, _64K * 2, cudaMemcpyHostToDevice);
+  cudaError_t err = cudaMemcpy(inputPrefix, inputPrefixPinned, _64K * 2, cudaMemcpyHostToDevice);
 
   // We do not need the input pinned memory anymore
   FreeHostBuffer(inputPrefixPinned, inputPrefixPinnedCuda);
   inputPrefixPinned = NULL;
   lostWarning = false;
 
-  cudaError_t err = cudaGetLastError();
+  cudaError_t last = cudaGetLastError();
+  if (err == cudaSuccess) err = last;
   if (err != cudaSuccess) {
     printf("GPUEngine: SetPattern: %s\n", cudaGetErrorString(err));
   }
@@ -514,8 +520,8 @@ void GPUEngine::SetPrefix(std::vector<LPREFIX> prefixes, uint32_t totalPrefix) {
   }
 
   // Fill device memory
-  cudaMemcpy(inputPrefix, inputPrefixPinned, _64K * 2, cudaMemcpyHostToDevice);
-  cudaMemcpy(inputPrefixLookUp, inputPrefixLookUpPinned, (_64K+totalPrefix) * 4, cudaMemcpyHostToDevice);
+  cudaError_t err1 = cudaMemcpy(inputPrefix, inputPrefixPinned, _64K * 2, cudaMemcpyHostToDevice);
+  cudaError_t err2 = cudaMemcpy(inputPrefixLookUp, inputPrefixLookUpPinned, (_64K+totalPrefix) * 4, cudaMemcpyHostToDevice);
 
   // We do not need the input pinned memory anymore
   FreeHostBuffer(inputPrefixPinned, inputPrefixPinnedCuda);
@@ -524,10 +530,9 @@ void GPUEngine::SetPrefix(std::vector<LPREFIX> prefixes, uint32_t totalPrefix) {
   inputPrefixLookUpPinned = NULL;
   lostWarning = false;
 
-  err = cudaGetLastError();
-  if (err != cudaSuccess) {
-    printf("GPUEngine: SetPrefix (large): %s\n", cudaGetErrorString(err));
-  }
+  cudaError_t last = cudaGetLastError();
+  cudaError_t err = (err1 != cudaSuccess) ? err1 : ((err2 != cudaSuccess) ? err2 : last);
+  if (err != cudaSuccess) printf("GPUEngine: SetPrefix (large): %s\n", cudaGetErrorString(err));
 
 }
 
@@ -600,7 +605,7 @@ bool GPUEngine::SetKeys(Point *p) {
   }
 
   // Fill device memory
-  cudaMemcpy(inputKey, inputKeyPinned, nbThread*32*2, cudaMemcpyHostToDevice);
+  cudaError_t err = cudaMemcpy(inputKey, inputKeyPinned, nbThread*32*2, cudaMemcpyHostToDevice);
 
   if (!rekey) {
     // We do not need the input pinned memory anymore
@@ -608,7 +613,8 @@ bool GPUEngine::SetKeys(Point *p) {
     inputKeyPinned = NULL;
   }
 
-  cudaError_t err = cudaGetLastError();
+  cudaError_t last = cudaGetLastError();
+  if (err == cudaSuccess) err = last;
   if (err != cudaSuccess) {
     printf("GPUEngine: SetKeys: %s\n", cudaGetErrorString(err));
   }
@@ -815,7 +821,12 @@ bool GPUEngine::Check(Secp256K1 *secp) {
   SetPrefix(prefs);
   SetKeys(p2);
   double t0 = Timer::get_tick();
-  Launch(found,true);
+  if (!Launch(found,true)) {
+    printf("GPU/CPU check Aborted: GPU launch/copy failed (see errors above). Try smaller -g.\n");
+    delete[] p;
+    delete[] p2;
+    return false;
+  }
   double t1 = Timer::get_tick();
   Timer::printResult((char *)"Key", 6*STEP_SIZE*nbThread, t0, t1);
 
