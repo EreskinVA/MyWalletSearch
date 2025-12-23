@@ -11,6 +11,7 @@
 #include "Point.h"
 #include <immintrin.h>
 #include <stdint.h>
+#include <cstdint>
 
 // Проверка поддержки AVX-512 на runtime
 bool CheckAVX512Support();

@@ -9,6 +9,7 @@
 #include "Int.h"
 #include "Point.h"
 #include <stdint.h>
+#include <cstdint>
 
 #ifdef __aarch64__
 #include <arm_neon.h>

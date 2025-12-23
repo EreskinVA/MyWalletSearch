@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 #include <ctime>
+#include <cstdint>
 
 // Структура для сохранения прогресса одного сегмента
 typedef struct {

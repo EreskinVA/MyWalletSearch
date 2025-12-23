@@ -13,6 +13,8 @@
 #include <map>
 #include <vector>
 #include <string>
+#include <cstdint>
+#include <ctime>
 
 // Distinguished Point - точка для collision detection
 typedef struct {

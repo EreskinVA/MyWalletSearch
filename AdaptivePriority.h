@@ -8,6 +8,7 @@
 
 #include <vector>
 #include <map>
+#include <cstdint>
 
 // Приоритет сегмента
 typedef struct {

@@ -9,6 +9,7 @@
 #include <vector>
 #include <map>
 #include <ctime>
+#include <cstdint>
 
 // Статистика производительности сегмента
 typedef struct {

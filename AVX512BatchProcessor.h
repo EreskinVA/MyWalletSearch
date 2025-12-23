@@ -10,6 +10,7 @@
 #include "Point.h"
 #include "SECP256k1.h"
 #include "AVX512.h"
+#include <cstdint>
 
 #define AVX512_BATCH_SIZE 8
 
