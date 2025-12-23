@@ -37,7 +37,8 @@ void printUsage() {
   printf("             [-gpuId gpuId1[,gpuId2,...]] [-g g1x,g1y,[,g2x,g2y,...]]\n");
   printf("             [-o outputfile] [-m maxFound] [-ps seed] [-s seed] [-t nbThread]\n");
   printf("             [-nosse] [-r rekey] [-check] [-kp] [-sp startPubKey]\n");
-  printf("             [-rp privkey partialkeyfile] [prefix]\n\n");
+  printf("             [-rp privkey partialkeyfile] [-seg segmentfile] [-bits bitrange]\n");
+  printf("             [prefix]\n\n");
   printf(" prefix: prefix to search (Can contains wildcard '?' or '*')\n");
   printf(" -v: Print version\n");
   printf(" -u: Search uncompressed addresses\n");
@@ -62,6 +63,8 @@ void printUsage() {
   printf(" -rp privkey partialkeyfile: Reconstruct final private key(s) from partial key(s) info.\n");
   printf(" -sp startPubKey: Start the search with a pubKey (for private key splitting)\n");
   printf(" -r rekey: Rekey interval in MegaKey, default is disabled\n");
+  printf(" -seg segmentfile: Use segment search from config file (e.g., segments_puzzle71.txt)\n");
+  printf(" -bits bitrange: Bit range for segment search (e.g., 71 for puzzle 71)\n");
   exit(0);
 
 }
@@ -400,6 +403,9 @@ int main(int argc, char* argv[]) {
   bool startPubKeyCompressed;
   bool caseSensitive = true;
   bool paranoiacSeed = false;
+  bool useSegments = false;
+  string segmentFile = "";
+  int bitRange = 0;
 
   while (a < argc) {
 
@@ -530,6 +536,15 @@ int main(int argc, char* argv[]) {
       a++;
       rekey = (uint64_t)getInt("rekey", argv[a]);
       a++;
+    } else if (strcmp(argv[a], "-seg") == 0) {
+      a++;
+      segmentFile = string(argv[a]);
+      useSegments = true;
+      a++;
+    } else if (strcmp(argv[a], "-bits") == 0) {
+      a++;
+      bitRange = getInt("bitRange", argv[a]);
+      a++;
     } else if (strcmp(argv[a], "-h") == 0) {
       printUsage();
     } else if (a == argc - 1) {
@@ -566,8 +581,25 @@ int main(int argc, char* argv[]) {
     searchMode = (startPubKeyCompressed)?SEARCH_COMPRESSED:SEARCH_UNCOMPRESSED;
   }
 
+  // Validate segment search parameters
+  if (useSegments) {
+    if (segmentFile.empty()) {
+      printf("Error: -seg requires a segment configuration file\n");
+      exit(-1);
+    }
+    if (bitRange == 0) {
+      printf("Error: -seg requires -bits parameter (e.g., -bits 71)\n");
+      exit(-1);
+    }
+    printf("\n=== Segment Search Mode ===\n");
+    printf("Config file: %s\n", segmentFile.c_str());
+    printf("Bit range: %d\n", bitRange);
+    printf("==========================\n\n");
+  }
+
   VanitySearch *v = new VanitySearch(secp, prefix, seed, searchMode, gpuEnable, stop, outputFile, sse,
-    maxFound, rekey, caseSensitive, startPuKey, paranoiacSeed);
+    maxFound, rekey, caseSensitive, startPuKey, paranoiacSeed, 
+    useSegments, segmentFile, bitRange);
   v->Search(nbCPUThread,gpuId,gridSize);
 
   return 0;

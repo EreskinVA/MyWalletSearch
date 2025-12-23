@@ -1,0 +1,81 @@
+/*
+ * Segment Search Extension for VanitySearch
+ * Позволяет искать в заданных сегментах диапазона ключей
+ */
+
+#ifndef SEGMENTSEARCHH
+#define SEGMENTSEARCHH
+
+#include "Int.h"
+#include <vector>
+#include <string>
+
+// Направление поиска в сегменте
+enum SearchDirection {
+  DIRECTION_UP,    // Поиск от начала к концу (вверх)
+  DIRECTION_DOWN   // Поиск от конца к началу (вниз)
+};
+
+// Структура для описания одного сегмента поиска
+typedef struct {
+  double startPercent;        // Начало сегмента в процентах (0.0 - 100.0)
+  double endPercent;          // Конец сегмента в процентах (0.0 - 100.0)
+  SearchDirection direction;  // Направление поиска
+  Int rangeStart;            // Начальный ключ сегмента (вычисляется)
+  Int rangeEnd;              // Конечный ключ сегмента (вычисляется)
+  Int currentKey;            // Текущая позиция поиска
+  bool active;               // Активен ли этот сегмент
+  std::string name;          // Имя сегмента для логирования
+} SearchSegment;
+
+class SegmentSearch {
+
+public:
+  SegmentSearch();
+  ~SegmentSearch();
+
+  // Загрузить конфигурацию сегментов из файла
+  bool LoadSegmentsFromFile(const std::string &filename);
+  
+  // Добавить сегмент вручную
+  void AddSegment(double startPercent, double endPercent, 
+                  SearchDirection direction, const std::string &name = "");
+  
+  // Инициализировать все сегменты для заданного битового диапазона
+  void InitializeSegments(int bitRange);
+  
+  // Получить начальный ключ для потока
+  bool GetStartingKey(int threadId, Int &key);
+  
+  // Получить следующий ключ в текущем сегменте
+  bool GetNextKey(int threadId, Int &key);
+  
+  // Проверить, завершен ли поиск во всех сегментах
+  bool IsSearchComplete();
+  
+  // Вывести информацию о сегментах
+  void PrintSegments();
+  
+  // Получить количество активных сегментов
+  int GetActiveSegmentCount() const { return activeSegments; }
+  
+  // Получить общий прогресс поиска
+  double GetOverallProgress();
+
+private:
+  std::vector<SearchSegment> segments;
+  int bitRange;
+  Int fullRangeStart;    // 2^(n-1)
+  Int fullRangeEnd;      // 2^n - 1
+  Int fullRangeSize;     // Размер полного диапазона
+  int activeSegments;
+  
+  // Вычислить ключ для заданного процента
+  void CalculateKeyAtPercent(double percent, Int &result);
+  
+  // Распределить сегменты между потоками
+  int GetSegmentForThread(int threadId);
+};
+
+#endif // SEGMENTSEARCHH
+

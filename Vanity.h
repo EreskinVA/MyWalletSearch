@@ -22,6 +22,7 @@
 #include <vector>
 #include "SECP256k1.h"
 #include "GPU/GPUEngine.h"
+#include "SegmentSearch.h"
 #ifdef WIN64
 #include <Windows.h>
 #endif
@@ -72,7 +73,8 @@ public:
 
   VanitySearch(Secp256K1 *secp, std::vector<std::string> &prefix, std::string seed, int searchMode,
                bool useGpu,bool stop,std::string outputFile, bool useSSE,uint32_t maxFound,uint64_t rekey,
-               bool caseSensitive,Point &startPubKey,bool paranoiacSeed);
+               bool caseSensitive,Point &startPubKey,bool paranoiacSeed,
+               bool useSegments=false,std::string segmentFile="",int bitRange=0);
 
   void Search(int nbThread,std::vector<int> gpuId,std::vector<int> gridSize);
   void FindKeyCPU(TH_PARAM *p);
@@ -139,6 +141,10 @@ private:
   Int lambda;
   Int beta2;
   Int lambda2;
+
+  // Segment search support
+  bool useSegmentSearch;
+  SegmentSearch *segmentSearch;
 
 #ifdef WIN64
   HANDLE ghMutex;

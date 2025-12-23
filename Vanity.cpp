@@ -40,7 +40,8 @@ Point _2Gn;
 
 VanitySearch::VanitySearch(Secp256K1 *secp, vector<std::string> &inputPrefixes,string seed,int searchMode,
                            bool useGpu, bool stop, string outputFile, bool useSSE, uint32_t maxFound,
-                           uint64_t rekey, bool caseSensitive, Point &startPubKey, bool paranoiacSeed)
+                           uint64_t rekey, bool caseSensitive, Point &startPubKey, bool paranoiacSeed,
+                           bool useSegments, string segmentFile, int bitRange)
   :inputPrefixes(inputPrefixes) {
 
   this->secp = secp;
@@ -57,6 +58,26 @@ VanitySearch::VanitySearch(Secp256K1 *secp, vector<std::string> &inputPrefixes,s
   this->hasPattern = false;
   this->caseSensitive = caseSensitive;
   this->startPubKeySpecified = !startPubKey.isZero();
+  this->useSegmentSearch = useSegments;
+  this->segmentSearch = NULL;
+
+  // Initialize segment search if requested
+  if (useSegmentSearch) {
+    segmentSearch = new SegmentSearch();
+    if (!segmentFile.empty()) {
+      if (segmentSearch->LoadSegmentsFromFile(segmentFile)) {
+        if (bitRange > 0) {
+          segmentSearch->InitializeSegments(bitRange);
+          segmentSearch->PrintSegments();
+        }
+      } else {
+        printf("Warning: Failed to load segment file, using standard search\n");
+        delete segmentSearch;
+        segmentSearch = NULL;
+        this->useSegmentSearch = false;
+      }
+    }
+  }
 
   lastRekey = 0;
   prefixes.clear();
@@ -1265,7 +1286,13 @@ void VanitySearch::checkAddressesSSE(bool compressed,Int key, int i, Point p1, P
 // ----------------------------------------------------------------------------
 void VanitySearch::getCPUStartingKey(int thId,Int& key,Point& startP) {
 
-  if (rekey > 0) {
+  // Use segment search if enabled
+  if (useSegmentSearch && segmentSearch != NULL) {
+    if (!segmentSearch->GetStartingKey(thId, key)) {
+      // Fallback to standard method if segment search fails
+      key.Rand(256);
+    }
+  } else if (rekey > 0) {
     key.Rand(256);
   } else {
     key.Set(&startKey);
@@ -1273,6 +1300,7 @@ void VanitySearch::getCPUStartingKey(int thId,Int& key,Point& startP) {
     off.ShiftL(64);
     key.Add(&off);
   }
+  
   Int km(&key);
   km.Add((uint64_t)CPU_GRP_SIZE / 2);
   startP = secp->ComputePublicKey(&km);
