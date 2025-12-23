@@ -75,7 +75,8 @@ public:
                bool useGpu,bool stop,std::string outputFile, bool useSSE,uint32_t maxFound,uint64_t rekey,
                bool caseSensitive,Point &startPubKey,bool paranoiacSeed,
                bool useSegments=false,std::string segmentFile="",int bitRange=0,
-               std::string progressFile="",bool resumeProgress=false,int autoSaveInterval=300);
+               std::string progressFile="",bool resumeProgress=false,int autoSaveInterval=300,
+               bool useKangaroo=false);
 
   void Search(int nbThread,std::vector<int> gpuId,std::vector<int> gridSize);
   void FindKeyCPU(TH_PARAM *p);

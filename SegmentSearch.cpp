@@ -17,6 +17,8 @@ SegmentSearch::SegmentSearch() {
   keysCheckedSinceLastSave = 0;
   loadBalancer = NULL;
   loadBalancingEnabled = false;
+  searchAlgorithm = ALGORITHM_STANDARD;  // По умолчанию стандартный
+  kangarooSearch = NULL;
 }
 
 SegmentSearch::~SegmentSearch() {
@@ -28,6 +30,10 @@ SegmentSearch::~SegmentSearch() {
   if (loadBalancer != NULL) {
     delete loadBalancer;
     loadBalancer = NULL;
+  }
+  if (kangarooSearch != NULL) {
+    delete kangarooSearch;
+    kangarooSearch = NULL;
   }
 }
 
@@ -480,5 +486,45 @@ bool SegmentSearch::PerformRebalance() {
   }
   
   return loadBalancer->Rebalance();
+}
+
+void SegmentSearch::SetSearchAlgorithm(SearchAlgorithm algorithm) {
+  searchAlgorithm = algorithm;
+  
+  if (algorithm == ALGORITHM_KANGAROO) {
+    printf("[SegmentSearch] Алгоритм поиска: Pollard's Kangaroo 🦘\n");
+    printf("[SegmentSearch] Теоретическая сложность: O(sqrt(N))\n");
+    printf("[SegmentSearch] Ожидаемое ускорение: до 2^35x\n");
+  } else {
+    printf("[SegmentSearch] Алгоритм поиска: Стандартный линейный\n");
+  }
+}
+
+bool SegmentSearch::SearchSegmentWithKangaroo(int segmentIndex, Secp256K1 *secp,
+                                                const Point &targetPubKey, Int &foundKey) {
+  if (segmentIndex < 0 || segmentIndex >= (int)segments.size()) {
+    return false;
+  }
+  
+  const SearchSegment &seg = segments[segmentIndex];
+  
+  printf("\n[Kangaroo] Поиск в сегменте: %s\n", seg.name.c_str());
+  printf("[Kangaroo] Диапазон: %.2f%% - %.2f%%\n", seg.startPercent, seg.endPercent);
+  
+  // Создать Kangaroo search для этого сегмента
+  if (kangarooSearch == NULL) {
+    kangarooSearch = new KangarooSearch(secp);
+  }
+  
+  // Инициализировать для диапазона сегмента
+  kangarooSearch->Initialize(seg.rangeStart, seg.rangeEnd, targetPubKey);
+  
+  // Настроить параметры
+  kangarooSearch->SetNumKangaroos(4, 4);  // 4 tame, 4 wild
+  
+  // Запустить поиск
+  bool found = kangarooSearch->Search(foundKey, 0);  // 0 = без лимита
+  
+  return found;
 }
 

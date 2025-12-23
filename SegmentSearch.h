@@ -9,6 +9,7 @@
 #include "Int.h"
 #include "ProgressManager.h"
 #include "LoadBalancer.h"
+#include "KangarooSearch.h"
 #include <vector>
 #include <string>
 
@@ -16,6 +17,12 @@
 enum SearchDirection {
   DIRECTION_UP,    // Поиск от начала к концу (вверх)
   DIRECTION_DOWN   // Поиск от конца к началу (вниз)
+};
+
+// Алгоритм поиска
+enum SearchAlgorithm {
+  ALGORITHM_STANDARD,  // Стандартный линейный поиск
+  ALGORITHM_KANGAROO   // Pollard's Kangaroo (O(sqrt(N)))
 };
 
 // Структура для описания одного сегмента поиска
@@ -75,6 +82,14 @@ public:
   void EnableLoadBalancing(int numThreads, int rebalanceInterval = 60);
   void UpdateLoadStats(int threadId, uint64_t keysChecked, double keysPerSecond);
   bool PerformRebalance();
+  
+  // Выбор алгоритма поиска
+  void SetSearchAlgorithm(SearchAlgorithm algorithm);
+  SearchAlgorithm GetSearchAlgorithm() const { return searchAlgorithm; }
+  
+  // Kangaroo search для сегмента
+  bool SearchSegmentWithKangaroo(int segmentIndex, Secp256K1 *secp, 
+                                  const Point &targetPubKey, Int &foundKey);
 
 private:
   std::vector<SearchSegment> segments;
@@ -93,6 +108,10 @@ private:
   // Load balancing
   LoadBalancer *loadBalancer;
   bool loadBalancingEnabled;
+  
+  // Search algorithm
+  SearchAlgorithm searchAlgorithm;
+  KangarooSearch *kangarooSearch;
   
   // Вычислить ключ для заданного процента
   void CalculateKeyAtPercent(double percent, Int &result);

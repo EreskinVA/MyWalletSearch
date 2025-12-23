@@ -42,7 +42,8 @@ VanitySearch::VanitySearch(Secp256K1 *secp, vector<std::string> &inputPrefixes,s
                            bool useGpu, bool stop, string outputFile, bool useSSE, uint32_t maxFound,
                            uint64_t rekey, bool caseSensitive, Point &startPubKey, bool paranoiacSeed,
                            bool useSegments, string segmentFile, int bitRange,
-                           string progressFile, bool resumeProgress, int autoSaveInterval)
+                           string progressFile, bool resumeProgress, int autoSaveInterval,
+                           bool useKangaroo)
   :inputPrefixes(inputPrefixes) {
 
   this->secp = secp;
@@ -95,6 +96,11 @@ VanitySearch::VanitySearch(Secp256K1 *secp, vector<std::string> &inputPrefixes,s
     // Enable progress saving if requested
     if (!progressFile.empty() && segmentSearch != NULL) {
       segmentSearch->EnableProgressSaving(progressFile, autoSaveInterval);
+    }
+    
+    // Set search algorithm
+    if (useKangaroo && segmentSearch != NULL) {
+      segmentSearch->SetSearchAlgorithm(ALGORITHM_KANGAROO);
     }
   }
 

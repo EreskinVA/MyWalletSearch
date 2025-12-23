@@ -1,0 +1,398 @@
+/*
+ * Pollard's Kangaroo Algorithm Implementation
+ * Based on "Monte Carlo Methods for Index Computation (mod p)" by J.M. Pollard
+ */
+
+#include "KangarooSearch.h"
+#include "hash/sha256.h"
+#include <cmath>
+#include <ctime>
+#include <fstream>
+#include <iostream>
+
+KangarooSearch::KangarooSearch(Secp256K1 *secp) {
+  this->secp = secp;
+  jumpDistanceBits = 16;      // По умолчанию
+  distinguishedBits = 20;     // ~1 из 1M точек будет DP
+  numTameKangaroos = 4;
+  numWildKangaroos = 4;
+  totalJumps = 0;
+  distinguishedPointsFound = 0;
+  searchStartTime = 0;
+}
+
+KangarooSearch::~KangarooSearch() {
+  distinguishedPoints.clear();
+  jumpTable.clear();
+  jumpDistances.clear();
+  tameKangaroos.clear();
+  wildKangaroos.clear();
+}
+
+void KangarooSearch::Initialize(const Int &start, const Int &end, const Point &target) {
+  rangeStart.Set(&start);
+  rangeEnd.Set(&end);
+  targetPubKey = target;
+  
+  // Вычислить размер диапазона
+  rangeSize.Set(&rangeEnd);
+  rangeSize.Sub(&rangeStart);
+  
+  printf("[Kangaroo] Инициализация поиска\n");
+  printf("[Kangaroo] Диапазон: %s\n", rangeStart.GetBase16().c_str());
+  printf("[Kangaroo]      до: %s\n", rangeEnd.GetBase16().c_str());
+  printf("[Kangaroo] Размер: 2^%.2f\n", log2(rangeSize.ToDouble()));
+  
+  // Оптимальные параметры на основе размера диапазона
+  // Jump distance ~ sqrt(rangeSize) / 256
+  double rangeBits = log2(rangeSize.ToDouble());
+  jumpDistanceBits = (int)(rangeBits / 2.0) - 8;
+  if (jumpDistanceBits < 8) jumpDistanceBits = 8;
+  if (jumpDistanceBits > 32) jumpDistanceBits = 32;
+  
+  printf("[Kangaroo] Jump distance: 2^%d\n", jumpDistanceBits);
+  printf("[Kangaroo] Distinguished bits: %d (1 из %d точек)\n", 
+         distinguishedBits, 1 << distinguishedBits);
+  printf("[Kangaroo] Кенгуру: %d tame, %d wild\n", numTameKangaroos, numWildKangaroos);
+  
+  // Инициализация
+  InitializeJumpTable();
+  InitializeKangaroos();
+  
+  searchStartTime = time(NULL);
+  
+  printf("[Kangaroo] ✓ Инициализация завершена\n\n");
+}
+
+void KangarooSearch::InitializeJumpTable() {
+  // Создать таблицу прыжков для быстрого вычисления
+  // Используем 256 предвычисленных точек
+  
+  jumpTable.clear();
+  jumpDistances.clear();
+  
+  printf("[Kangaroo] Генерация таблицы прыжков...\n");
+  
+  for (int i = 0; i < 256; i++) {
+    // Расстояние прыжка зависит от хеша позиции
+    Int jumpDist;
+    jumpDist.SetInt32(1);
+    jumpDist.ShiftL(jumpDistanceBits);
+    
+    // Добавляем вариацию на основе индекса
+    Int variation;
+    variation.SetInt32(i);
+    variation.ShiftL(jumpDistanceBits - 8);
+    jumpDist.Add(&variation);
+    
+    // Вычислить соответствующую точку
+    Point jumpPoint = secp->ComputePublicKey(&jumpDist);
+    
+    jumpTable.push_back(jumpPoint);
+    jumpDistances.push_back(jumpDist);
+  }
+  
+  printf("[Kangaroo] ✓ Таблица прыжков: 256 точек\n");
+}
+
+void KangarooSearch::InitializeKangaroos() {
+  tameKangaroos.clear();
+  wildKangaroos.clear();
+  
+  // Инициализация tame кенгуру (стартуют от rangeStart)
+  for (int i = 0; i < numTameKangaroos; i++) {
+    KangarooState kangaroo;
+    
+    // Начальная позиция: rangeStart + небольшое смещение
+    Int startKey;
+    startKey.Set(&rangeStart);
+    Int offset;
+    offset.SetInt32(i);
+    offset.ShiftL(32);
+    startKey.Add(&offset);
+    
+    kangaroo.position = secp->ComputePublicKey(&startKey);
+    kangaroo.distance.Set(&offset);
+    kangaroo.jumps = 0;
+    kangaroo.active = true;
+    
+    tameKangaroos.push_back(kangaroo);
+  }
+  
+  // Инициализация wild кенгуру (стартуют от targetPubKey)
+  for (int i = 0; i < numWildKangaroos; i++) {
+    KangarooState kangaroo;
+    
+    kangaroo.position = targetPubKey;  // Начинаем с целевой точки
+    kangaroo.distance.SetInt32(0);     // Расстояние неизвестно
+    kangaroo.jumps = 0;
+    kangaroo.active = true;
+    
+    wildKangaroos.push_back(kangaroo);
+  }
+  
+  printf("[Kangaroo] ✓ Кенгуру инициализированы\n");
+}
+
+Int KangarooSearch::CalculateJumpDistance(const Point &position) {
+  // Выбор прыжка на основе хеша позиции
+  // Детерминированно, но pseudo-random
+  
+  unsigned char hash[32];
+  sha256(position.x.bits64, 32, hash);
+  
+  // Используем первый байт для индекса
+  int index = hash[0];
+  
+  return jumpDistances[index];
+}
+
+Point KangarooSearch::ComputeJump(const Point &position, Int &jumpDist) {
+  // Вычислить следующую позицию после прыжка
+  
+  unsigned char hash[32];
+  sha256(position.x.bits64, 32, hash);
+  
+  int index = hash[0];
+  jumpDist.Set(&jumpDistances[index]);
+  
+  // position + jumpTable[index]
+  return secp->AddDirect(position, jumpTable[index]);
+}
+
+bool KangarooSearch::IsDistinguished(const Point &p) {
+  // Точка distinguished если последние N бит её хеша = 0
+  
+  unsigned char hash[32];
+  sha256(p.x.bits64, 32, hash);
+  
+  // Проверяем последние биты
+  uint32_t check = *(uint32_t*)hash;
+  uint32_t mask = (1 << distinguishedBits) - 1;
+  
+  return (check & mask) == 0;
+}
+
+std::string KangarooSearch::ComputeDistinguishedHash(const Point &p) {
+  // Уникальный хеш для distinguished point
+  unsigned char hash[32];
+  sha256(p.x.bits64, 32, hash);
+  
+  char hex[65];
+  for (int i = 0; i < 32; i++) {
+    sprintf(hex + i*2, "%02x", hash[i]);
+  }
+  
+  return std::string(hex);
+}
+
+bool KangarooSearch::StepKangaroo(KangarooState &kangaroo, bool isTame) {
+  if (!kangaroo.active) return false;
+  
+  // Сделать один прыжок
+  Int jumpDist;
+  Point newPosition = ComputeJump(kangaroo.position, jumpDist);
+  
+  kangaroo.position = newPosition;
+  kangaroo.distance.Add(&jumpDist);
+  kangaroo.jumps++;
+  totalJumps++;
+  
+  // Проверка на distinguished point
+  if (IsDistinguished(kangaroo.position)) {
+    DistinguishedPoint dp;
+    dp.position = kangaroo.position;
+    dp.distance.Set(&kangaroo.distance);
+    dp.isTame = isTame;
+    dp.dpHash = ComputeDistinguishedHash(kangaroo.position);
+    dp.timestamp = time(NULL);
+    
+    // Сохранить DP
+    distinguishedPoints[dp.dpHash] = dp;
+    distinguishedPointsFound++;
+    
+    return true;  // Found DP
+  }
+  
+  return false;
+}
+
+bool KangarooSearch::CheckCollision(const DistinguishedPoint &dp, Int &privateKey) {
+  // Проверить, есть ли коллизия с DP другого типа
+  
+  auto it = distinguishedPoints.find(dp.dpHash);
+  if (it == distinguishedPoints.end()) {
+    return false;
+  }
+  
+  const DistinguishedPoint &storedDP = it->second;
+  
+  // Коллизия только если разные типы кенгуру
+  if (storedDP.isTame == dp.isTame) {
+    return false;
+  }
+  
+  // COLLISION! Восстанавливаем приватный ключ
+  printf("\n[Kangaroo] 🎉 COLLISION DETECTED!\n");
+  printf("[Kangaroo] Tame distance: %s\n", 
+         (storedDP.isTame ? storedDP.distance : dp.distance).GetBase16().c_str());
+  printf("[Kangaroo] Wild distance: %s\n",
+         (!storedDP.isTame ? storedDP.distance : dp.distance).GetBase16().c_str());
+  
+  privateKey = ReconstructPrivateKey(
+    storedDP.isTame ? storedDP : dp,
+    storedDP.isTame ? dp : storedDP
+  );
+  
+  return true;
+}
+
+Int KangarooSearch::ReconstructPrivateKey(const DistinguishedPoint &tameDP,
+                                           const DistinguishedPoint &wildDP) {
+  // Private key = rangeStart + tameDistance - wildDistance
+  // Потому что: (rangeStart + tame) * G = (target - wild) * G
+  // => target = rangeStart + tame + wild
+  
+  Int privateKey;
+  privateKey.Set(&rangeStart);
+  privateKey.Add(&tameDP.distance);
+  privateKey.Add(&wildDP.distance);
+  
+  // Модуль по order кривой
+  privateKey.Mod(&secp->order);
+  
+  return privateKey;
+}
+
+bool KangarooSearch::Search(Int &foundPrivateKey, int maxIterations) {
+  printf("[Kangaroo] 🦘 Начинаем поиск...\n\n");
+  
+  uint64_t iteration = 0;
+  time_t lastStatus = time(NULL);
+  
+  while (true) {
+    // Проверка лимита итераций
+    if (maxIterations > 0 && iteration >= (uint64_t)maxIterations) {
+      printf("[Kangaroo] Достигнут лимит итераций: %d\n", maxIterations);
+      return false;
+    }
+    
+    // Шаг для всех tame кенгуру
+    for (auto &kangaroo : tameKangaroos) {
+      if (StepKangaroo(kangaroo, true)) {
+        // Found distinguished point - проверяем collision
+        DistinguishedPoint dp;
+        dp.position = kangaroo.position;
+        dp.distance.Set(&kangaroo.distance);
+        dp.isTame = true;
+        dp.dpHash = ComputeDistinguishedHash(kangaroo.position);
+        
+        if (CheckCollision(dp, foundPrivateKey)) {
+          PrintStatistics();
+          return true;
+        }
+      }
+    }
+    
+    // Шаг для всех wild кенгуру
+    for (auto &kangaroo : wildKangaroos) {
+      if (StepKangaroo(kangaroo, false)) {
+        DistinguishedPoint dp;
+        dp.position = kangaroo.position;
+        dp.distance.Set(&kangaroo.distance);
+        dp.isTame = false;
+        dp.dpHash = ComputeDistinguishedHash(kangaroo.position);
+        
+        if (CheckCollision(dp, foundPrivateKey)) {
+          PrintStatistics();
+          return true;
+        }
+      }
+    }
+    
+    iteration++;
+    
+    // Статус каждые 10 секунд
+    time_t now = time(NULL);
+    if (now - lastStatus >= 10) {
+      double mkeysPerSec = (totalJumps / 1000000.0) / (now - searchStartTime + 1);
+      double progress = GetExpectedOperations();
+      
+      printf("\r[Kangaroo] Jumps: %llu | DPs: %llu | Speed: %.2f MKey/s | Progress: %.6f%%",
+             (unsigned long long)totalJumps,
+             (unsigned long long)distinguishedPointsFound,
+             mkeysPerSec,
+             progress);
+      fflush(stdout);
+      
+      lastStatus = now;
+    }
+  }
+  
+  return false;
+}
+
+uint64_t KangarooSearch::GetTotalJumps() const {
+  return totalJumps;
+}
+
+uint64_t KangarooSearch::GetDistinguishedPointsFound() const {
+  return distinguishedPointsFound;
+}
+
+double KangarooSearch::GetExpectedOperations() const {
+  // Ожидаемое количество операций: sqrt(rangeSize) * sqrt(pi/2)
+  double rangeSqrt = sqrt(rangeSize.ToDouble());
+  double expected = rangeSqrt * sqrt(M_PI / 2.0);
+  
+  if (expected > 0) {
+    return (totalJumps / expected) * 100.0;
+  }
+  
+  return 0.0;
+}
+
+void KangarooSearch::PrintStatistics() const {
+  time_t elapsed = time(NULL) - searchStartTime;
+  
+  printf("\n\n");
+  printf("=== Статистика Pollard's Kangaroo ===\n");
+  printf("Всего прыжков:      %llu\n", (unsigned long long)totalJumps);
+  printf("Distinguished pts:  %llu\n", (unsigned long long)distinguishedPointsFound);
+  printf("Время работы:       %ld сек\n", elapsed);
+  
+  if (elapsed > 0) {
+    double mkeysPerSec = (totalJumps / 1000000.0) / elapsed;
+    printf("Средняя скорость:   %.2f MKey/s\n", mkeysPerSec);
+  }
+  
+  double expected = sqrt(rangeSize.ToDouble()) * sqrt(M_PI / 2.0);
+  double efficiency = (totalJumps / expected) * 100.0;
+  printf("Эффективность:      %.2f%% от теоретической\n", efficiency);
+  
+  printf("=====================================\n");
+}
+
+void KangarooSearch::SetJumpDistance(int avgBits) {
+  jumpDistanceBits = avgBits;
+}
+
+void KangarooSearch::SetDistinguishedBits(int bits) {
+  distinguishedBits = bits;
+}
+
+void KangarooSearch::SetNumKangaroos(int tame, int wild) {
+  numTameKangaroos = tame;
+  numWildKangaroos = wild;
+}
+
+bool KangarooSearch::SaveState(const std::string &filename) {
+  // TODO: Реализовать сохранение для long-running поиска
+  return false;
+}
+
+bool KangarooSearch::LoadState(const std::string &filename) {
+  // TODO: Реализовать загрузку состояния
+  return false;
+}
+
