@@ -44,7 +44,7 @@ public:
   Int();
   Int(int64_t i64);
   Int(uint64_t u64);
-  Int(Int *a);
+  Int(const Int *a);
 
   // Op
   void Add(uint64_t a);
@@ -149,7 +149,7 @@ public:
 
   // Setter
   void SetInt32(uint32_t value);
-  void Set(Int *a);
+  void Set(const Int *a);
   void SetBase10(char *value);
   void SetBase16(char *value);
   void SetBaseN(int n,char *charset,char *value);
@@ -211,9 +211,17 @@ private:
 
 // Inline routines
 
-#ifndef WIN64
+#if !defined(WIN64)
 
-// Missing intrinsics
+// ------------------------------------------------------------------
+// Intrinsics / helpers for non-Windows builds.
+// The original upstream implementation assumes x86_64 inline asm.
+// On ARM64 (Apple Silicon / aarch64) we provide portable fallbacks.
+// ------------------------------------------------------------------
+
+#if defined(__x86_64__) || defined(__i386__)
+
+// Missing intrinsics (x86/x64)
 static uint64_t inline _umul128(uint64_t a, uint64_t b, uint64_t *h) {
   uint64_t rhi;
   uint64_t rlo;
@@ -227,7 +235,7 @@ static int64_t inline _mul128(int64_t a, int64_t b, int64_t *h) {
   uint64_t rlo;
   __asm__( "imulq  %[b];" :"=d"(rhi),"=a"(rlo) :"1"(a),[b]"rm"(b));
   *h = rhi;
-  return rlo;  
+  return rlo;
 }
 
 static uint64_t inline _udiv128(uint64_t hi, uint64_t lo, uint64_t d,uint64_t *r) {
@@ -235,7 +243,7 @@ static uint64_t inline _udiv128(uint64_t hi, uint64_t lo, uint64_t d,uint64_t *r
   uint64_t _r;
   __asm__( "divq  %[d];" :"=d"(_r),"=a"(q) :"d"(hi),"a"(lo),[d]"rm"(d));
   *r = _r;
-  return q;  
+  return q;
 }
 
 static uint64_t inline __rdtsc() {
@@ -248,9 +256,62 @@ static uint64_t inline __rdtsc() {
 #define __shiftright128(a,b,n) ((a)>>(n))|((b)<<(64-(n)))
 #define __shiftleft128(a,b,n) ((b)<<(n))|((a)>>(64-(n)))
 
-
 #define _subborrow_u64(a,b,c,d) __builtin_ia32_sbb_u64(a,b,c,(long long unsigned int*)d);
 #define _addcarry_u64(a,b,c,d) __builtin_ia32_addcarryx_u64(a,b,c,(long long unsigned int*)d);
+
+#else
+
+// Portable fallbacks (ARM64 / other non-x86)
+#if defined(__APPLE__)
+#include <mach/mach_time.h>
+#endif
+
+static uint64_t inline _umul128(uint64_t a, uint64_t b, uint64_t *h) {
+  unsigned __int128 p = (unsigned __int128)a * (unsigned __int128)b;
+  *h = (uint64_t)(p >> 64);
+  return (uint64_t)p;
+}
+
+static int64_t inline _mul128(int64_t a, int64_t b, int64_t *h) {
+  __int128 p = (__int128)a * (__int128)b;
+  *h = (int64_t)(p >> 64);
+  return (int64_t)p;
+}
+
+static uint64_t inline _udiv128(uint64_t hi, uint64_t lo, uint64_t d, uint64_t *r) {
+  unsigned __int128 n = ((unsigned __int128)hi << 64) | (unsigned __int128)lo;
+  uint64_t q = (uint64_t)(n / (unsigned __int128)d);
+  *r = (uint64_t)(n % (unsigned __int128)d);
+  return q;
+}
+
+static uint64_t inline __rdtsc() {
+#if defined(__APPLE__)
+  return (uint64_t)mach_absolute_time();
+#else
+  // Best-effort fallback if mach_absolute_time isn't available.
+  return 0;
+#endif
+}
+
+#define __shiftright128(a,b,n) ((a)>>(n))|((b)<<(64-(n)))
+#define __shiftleft128(a,b,n) ((b)<<(n))|((a)>>(64-(n)))
+
+static inline unsigned char _addcarry_u64(unsigned char c, uint64_t a, uint64_t b, uint64_t *out) {
+  unsigned __int128 sum = (unsigned __int128)a + (unsigned __int128)b + (unsigned __int128)c;
+  *out = (uint64_t)sum;
+  return (unsigned char)(sum >> 64);
+}
+
+static inline unsigned char _subborrow_u64(unsigned char c, uint64_t a, uint64_t b, uint64_t *out) {
+  uint64_t bc = b + (uint64_t)c;
+  unsigned char borrow = (bc < b) || (a < bc);
+  *out = a - bc;
+  return borrow;
+}
+
+#endif
+
 #define _byteswap_uint64 __builtin_bswap64
 #define LZC(x) __builtin_clzll(x)
 #define TZC(x) __builtin_ctzll(x)

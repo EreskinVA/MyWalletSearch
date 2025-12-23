@@ -4,6 +4,7 @@
  */
 
 #include "NEON_ARM.h"
+#include "hash/sha256.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -75,12 +76,12 @@ void NEONOps::SHA256_4x(const uint8_t* inputs[4], size_t len,
         
         // Для простоты используем стандартную реализацию
         // В production версии здесь должна быть полная NEON оптимизация
-        sha256(inputs[i], len, outputs[i]);
+        sha256(inputs[i], (int)len, outputs[i]);
     }
 #else
     // Fallback на стандартную реализацию
     for (int i = 0; i < 4; i++) {
-        sha256(inputs[i], len, outputs[i]);
+        sha256(inputs[i], (int)len, outputs[i]);
     }
 #endif
 }

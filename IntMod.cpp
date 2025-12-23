@@ -16,7 +16,9 @@
 */
 
 #include "Int.h"
+#if defined(__x86_64__) || defined(__i386__) || defined(_M_X64)
 #include <emmintrin.h>
+#endif
 #include <string.h>
 
 #define MAX(x,y) (((x)>(y))?(x):(y))
@@ -221,6 +223,8 @@ void Int::DivStep62(Int* u,Int* v,int64_t* eta,int* pos,int64_t* uu,int64_t* uv,
 
   bitCount = 62;
 
+#if defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(WIN64)
+
   __m128i _u;
   __m128i _v;
   __m128i _t;
@@ -272,6 +276,48 @@ void Int::DivStep62(Int* u,Int* v,int64_t* eta,int* pos,int64_t* uu,int64_t* uv,
   *uv = ((int64_t *)&_u)[1];
   *vu = ((int64_t *)&_v)[0];
   *vv = ((int64_t *)&_v)[1];
+#endif
+
+#else
+
+  // Portable variant (ARM64 / non-x86): represent 128-bit vector lanes as scalars
+  uint64_t uu_s = 1, uv_s = 0;
+  uint64_t vu_s = 0, vv_s = 1;
+  uint64_t t0, t1;
+
+  while(true) {
+
+    // Use a sentinel bit to count zeros only up to bitCount
+    uint64_t zeros = TZC(v0 | 1ULL << bitCount);
+    vh >>= zeros;
+    v0 >>= zeros;
+    uu_s <<= zeros;
+    uv_s <<= zeros;
+    bitCount -= (int)zeros;
+
+    if(bitCount <= 0) {
+      break;
+    }
+
+    if( vh < uh ) {
+      SWAP(w,uh,vh);
+      SWAP(x,u0,v0);
+      SWAP(t0,uu_s,vu_s);
+      SWAP(t1,uv_s,vv_s);
+    }
+
+    vh -= uh;
+    v0 -= u0;
+    vu_s -= uu_s;
+    vv_s -= uv_s;
+
+  }
+
+  *uu = uu_s;
+  *uv = uv_s;
+  *vu = vu_s;
+  *vv = vv_s;
+
 #endif
 
 #endif

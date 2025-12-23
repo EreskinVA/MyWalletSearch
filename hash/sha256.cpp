@@ -30,8 +30,13 @@ namespace _sha256
 #define _byteswap_ulong __builtin_bswap32
 #define _byteswap_uint64 __builtin_bswap64
 inline uint32_t _rotr(uint32_t x, uint8_t r) {
+  // x86 uses inline asm for performance; on non-x86 (e.g. ARM64) fall back to portable rotate.
+#if defined(__x86_64__) || defined(__i386__)
   asm("rorl %1,%0" : "+r" (x) : "c" (r));
   return x;
+#else
+  return (x >> r) | (x << (32 - r));
+#endif
 }
 #endif
 
@@ -423,7 +428,7 @@ void CSHA256::Finalize(unsigned char hash[OUTPUT_SIZE])
     WRITEBE32(hash + 28, s[7]);
 }
 
-void sha256(unsigned char *input, int length, unsigned char *digest) {
+void sha256(const unsigned char *input, int length, unsigned char *digest) {
 
 	CSHA256 sha;
 	sha.Write(input, length);
@@ -478,7 +483,7 @@ void sha256_65(unsigned char *input, unsigned char *digest) {
 
 }
 
-void sha256_checksum(uint8_t *input, int length, uint8_t *checksum) {
+void sha256_checksum(const uint8_t *input, int length, uint8_t *checksum) {
 
   uint32_t s[8];
   uint8_t b[64];

@@ -19,7 +19,9 @@
 #include "IntGroup.h"
 #include <string.h>
 #include <math.h>
+#if defined(__x86_64__) || defined(__i386__) || defined(_M_X64)
 #include <emmintrin.h>
+#endif
 #include "Timer.h"
 
 #define MAX(x,y) (((x)>(y))?(x):(y))
@@ -33,7 +35,7 @@ Int _ONE((uint64_t)1);
 Int::Int() {
 }
 
-Int::Int(Int *a) {
+Int::Int(const Int *a) {
   if(a) Set(a);
   else CLEAR();
 }
@@ -72,7 +74,7 @@ void Int::CLEARFF() {
 
 // ------------------------------------------------
 
-void Int::Set(Int *a) {
+void Int::Set(const Int *a) {
 
   for (int i = 0; i<NB64BLOCK; i++)
   	bits64[i] = a->bits64[i];

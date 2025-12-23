@@ -367,6 +367,7 @@ void Secp256K1::GetHash160(int type,bool compressed,
 
     if (!compressed) {
 
+#if defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(WIN64)
       uint32_t b0[32];
       uint32_t b1[32];
       uint32_t b2[32];
@@ -379,9 +380,26 @@ void Secp256K1::GetHash160(int type,bool compressed,
 
       sha256sse_2B(b0, b1, b2, b3, sh0, sh1, sh2, sh3);
       ripemd160sse_32(sh0, sh1, sh2, sh3, h0, h1, h2, h3);
+#else
+      unsigned char pk0[65];
+      unsigned char pk1[65];
+      unsigned char pk2[65];
+      unsigned char pk3[65];
+
+      pk0[0] = 0x04; k0.x.Get32Bytes(pk0 + 1);  k0.y.Get32Bytes(pk0 + 33);
+      pk1[0] = 0x04; k1.x.Get32Bytes(pk1 + 1);  k1.y.Get32Bytes(pk1 + 33);
+      pk2[0] = 0x04; k2.x.Get32Bytes(pk2 + 1);  k2.y.Get32Bytes(pk2 + 33);
+      pk3[0] = 0x04; k3.x.Get32Bytes(pk3 + 1);  k3.y.Get32Bytes(pk3 + 33);
+
+      sha256(pk0, 65, sh0); ripemd160(sh0, 32, h0);
+      sha256(pk1, 65, sh1); ripemd160(sh1, 32, h1);
+      sha256(pk2, 65, sh2); ripemd160(sh2, 32, h2);
+      sha256(pk3, 65, sh3); ripemd160(sh3, 32, h3);
+#endif
 
     } else {
 
+#if defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(WIN64)
       uint32_t b0[16];
       uint32_t b1[16];
       uint32_t b2[16];
@@ -394,6 +412,22 @@ void Secp256K1::GetHash160(int type,bool compressed,
 
       sha256sse_1B(b0, b1, b2, b3, sh0, sh1, sh2, sh3);
       ripemd160sse_32(sh0, sh1, sh2, sh3, h0, h1, h2, h3);
+#else
+      unsigned char pk0[33];
+      unsigned char pk1[33];
+      unsigned char pk2[33];
+      unsigned char pk3[33];
+
+      pk0[0] = (unsigned char)(0x02 + k0.y.IsOdd()); k0.x.Get32Bytes(pk0 + 1);
+      pk1[0] = (unsigned char)(0x02 + k1.y.IsOdd()); k1.x.Get32Bytes(pk1 + 1);
+      pk2[0] = (unsigned char)(0x02 + k2.y.IsOdd()); k2.x.Get32Bytes(pk2 + 1);
+      pk3[0] = (unsigned char)(0x02 + k3.y.IsOdd()); k3.x.Get32Bytes(pk3 + 1);
+
+      sha256(pk0, 33, sh0); ripemd160(sh0, 32, h0);
+      sha256(pk1, 33, sh1); ripemd160(sh1, 32, h1);
+      sha256(pk2, 33, sh2); ripemd160(sh2, 32, h2);
+      sha256(pk3, 33, sh3); ripemd160(sh3, 32, h3);
+#endif
 
     }
 
@@ -411,6 +445,7 @@ void Secp256K1::GetHash160(int type,bool compressed,
     GetHash160(P2PKH,compressed,k0,k1,k2,k3,kh0,kh1,kh2,kh3);
 
     // Redeem Script (1 to 1 P2SH)
+#if defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(WIN64)
     uint32_t b0[16];
     uint32_t b1[16];
     uint32_t b2[16];
@@ -423,6 +458,22 @@ void Secp256K1::GetHash160(int type,bool compressed,
 
     sha256sse_1B(b0, b1, b2, b3, sh0, sh1, sh2, sh3);
     ripemd160sse_32(sh0, sh1, sh2, sh3, h0, h1, h2, h3);
+#else
+    unsigned char script0[22];
+    unsigned char script1[22];
+    unsigned char script2[22];
+    unsigned char script3[22];
+
+    script0[0] = 0x00; script0[1] = 0x14; memcpy(script0 + 2, kh0, 20);
+    script1[0] = 0x00; script1[1] = 0x14; memcpy(script1 + 2, kh1, 20);
+    script2[0] = 0x00; script2[1] = 0x14; memcpy(script2 + 2, kh2, 20);
+    script3[0] = 0x00; script3[1] = 0x14; memcpy(script3 + 2, kh3, 20);
+
+    sha256(script0, 22, sh0); ripemd160(sh0, 32, h0);
+    sha256(script1, 22, sh1); ripemd160(sh1, 32, h1);
+    sha256(script2, 22, sh2); ripemd160(sh2, 32, h2);
+    sha256(script3, 22, sh3); ripemd160(sh3, 32, h3);
+#endif
 
   }
   break;
@@ -695,7 +746,14 @@ std::vector<std::string> Secp256K1::GetAddress(int type, bool compressed, unsign
   CHECKSUM(b2, add2);
   CHECKSUM(b3, add3);
   CHECKSUM(b4, add4);
+#if defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(WIN64)
   sha256sse_checksum(b1,b2,b3,b4,add1 + 21, add2 + 21, add3 + 21, add4 + 21);
+#else
+  sha256_checksum(add1, 21, add1 + 21);
+  sha256_checksum(add2, 21, add2 + 21);
+  sha256_checksum(add3, 21, add3 + 21);
+  sha256_checksum(add4, 21, add4 + 21);
+#endif
 
   // Base58
   ret.push_back(EncodeBase58(add1, add1 + 25));

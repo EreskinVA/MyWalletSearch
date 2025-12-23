@@ -46,7 +46,7 @@ void KangarooSearch::Initialize(const Int &start, const Int &end, const Point &t
   // Оптимальные параметры на основе размера диапазона
   // Jump distance ~ sqrt(rangeSize) / 256
   Int tempSize;
-  tempSize.Set((Int*)&rangeSize);
+  tempSize.Set(&rangeSize);
   double rangeBits = log2(tempSize.ToDouble());
   jumpDistanceBits = (int)(rangeBits / 2.0) - 8;
   if (jumpDistanceBits < 8) jumpDistanceBits = 8;
@@ -141,7 +141,7 @@ Int KangarooSearch::CalculateJumpDistance(const Point &position) {
   // Детерминированно, но pseudo-random
   
   unsigned char hash[32];
-  sha256(position.x.bits64, 32, hash);
+  sha256(reinterpret_cast<const uint8_t*>(position.x.bits64), 32, hash);
   
   // Используем первый байт для индекса
   int index = hash[0];
@@ -154,8 +154,8 @@ Point KangarooSearch::ComputeJump(const Point &position, Int &jumpDist) {
   
   unsigned char hash[32];
   Int tempX;
-  tempX.Set((Int*)&position.x);
-  sha256((uint8_t*)tempX.bits64, 32, hash);
+  tempX.Set(&position.x);
+  sha256(reinterpret_cast<const uint8_t*>(tempX.bits64), 32, hash);
   
   int index = hash[0];
   jumpDist.Set(&jumpDistances[index]);
@@ -170,8 +170,8 @@ bool KangarooSearch::IsDistinguished(const Point &p) {
   
   unsigned char hash[32];
   Int tempX;
-  tempX.Set((Int*)&p.x);
-  sha256((uint8_t*)tempX.bits64, 32, hash);
+  tempX.Set(&p.x);
+  sha256(reinterpret_cast<const uint8_t*>(tempX.bits64), 32, hash);
   
   // Проверяем последние биты
   uint32_t check = *(uint32_t*)hash;
@@ -184,8 +184,8 @@ std::string KangarooSearch::ComputeDistinguishedHash(const Point &p) {
   // Уникальный хеш для distinguished point
   unsigned char hash[32];
   Int tempX;
-  tempX.Set((Int*)&p.x);
-  sha256((uint8_t*)tempX.bits64, 32, hash);
+  tempX.Set(&p.x);
+  sha256(reinterpret_cast<const uint8_t*>(tempX.bits64), 32, hash);
   
   char hex[65];
   for (int i = 0; i < 32; i++) {

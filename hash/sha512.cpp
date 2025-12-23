@@ -61,8 +61,13 @@ namespace _sha512 {
 #define _byteswap_ulong __builtin_bswap32
 #define _byteswap_uint64 __builtin_bswap64
 inline uint64_t _rotr64(uint64_t x, uint8_t r) {
+  // x86 uses inline asm for performance; on non-x86 (e.g. ARM64) fall back to portable rotate.
+#if defined(__x86_64__) || defined(__i386__)
   asm("rorq %1,%0" : "+r" (x) : "c" (r));
   return x;
+#else
+  return (x >> r) | (x << (64 - r));
+#endif
 }
 #endif
 

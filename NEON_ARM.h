@@ -10,6 +10,10 @@
 #include "Point.h"
 #include <stdint.h>
 #include <cstdint>
+#include <cstddef>
+#include <cstdio>
+#include <string>
+#include <vector>
 
 #ifdef __aarch64__
 #include <arm_neon.h>

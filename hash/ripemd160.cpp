@@ -33,8 +33,13 @@ void inline Initialize(uint32_t* s)
 
 #ifndef WIN64
 inline uint32_t _rotl(uint32_t x, uint8_t r) {
+  // x86 uses inline asm for performance; on non-x86 (e.g. ARM64) fall back to portable rotate.
+#if defined(__x86_64__) || defined(__i386__)
   asm("roll %1,%0" : "+r" (x) : "c" (r));
   return x;
+#else
+  return (x << r) | (x >> (32 - r));
+#endif
 }
 #endif
 

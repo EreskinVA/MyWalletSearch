@@ -3,37 +3,32 @@
 #
 # Author : Jean-Luc PONS
 
-SRC = Base58.cpp IntGroup.cpp main.cpp Random.cpp \
+SRC_COMMON = Base58.cpp IntGroup.cpp main.cpp Random.cpp \
       Timer.cpp Int.cpp IntMod.cpp Point.cpp SECP256K1.cpp \
       Vanity.cpp GPU/GPUGenerate.cpp hash/ripemd160.cpp \
-      hash/sha256.cpp hash/sha512.cpp hash/ripemd160_sse.cpp \
-      hash/sha256_sse.cpp Bech32.cpp Wildcard.cpp SegmentSearch.cpp \
-      ProgressManager.cpp LoadBalancer.cpp AdaptivePriority.cpp KangarooSearch.cpp \
-      AVX512.cpp AVX512BatchProcessor.cpp NEON_ARM.cpp
+      hash/sha256.cpp hash/sha512.cpp Bech32.cpp Wildcard.cpp SegmentSearch.cpp \
+      ProgressManager.cpp LoadBalancer.cpp AdaptivePriority.cpp KangarooSearch.cpp
+
+SRC_X86 = hash/ripemd160_sse.cpp hash/sha256_sse.cpp AVX512.cpp AVX512BatchProcessor.cpp
+SRC_ARM = NEON_ARM.cpp
 
 OBJDIR = obj
 
-ifdef gpu
+ARCH := $(shell uname -m)
 
-OBJET = $(addprefix $(OBJDIR)/, \
-        Base58.o IntGroup.o main.o Random.o Timer.o Int.o \
-        IntMod.o Point.o SECP256K1.o Vanity.o GPU/GPUGenerate.o \
-        hash/ripemd160.o hash/sha256.o hash/sha512.o \
-        hash/ripemd160_sse.o hash/sha256_sse.o \
-        GPU/GPUEngine.o Bech32.o Wildcard.o SegmentSearch.o \
-        ProgressManager.o LoadBalancer.o AdaptivePriority.o KangarooSearch.o \
-        AVX512.o AVX512BatchProcessor.o NEON_ARM.o)
-
+# Select sources based on architecture
+ifeq ($(ARCH),arm64)
+    SRC = $(SRC_COMMON) $(SRC_ARM)
+else ifeq ($(ARCH),aarch64)
+    SRC = $(SRC_COMMON) $(SRC_ARM)
 else
+    SRC = $(SRC_COMMON) $(SRC_X86)
+endif
 
-OBJET = $(addprefix $(OBJDIR)/, \
-        Base58.o IntGroup.o main.o Random.o Timer.o Int.o \
-        IntMod.o Point.o SECP256K1.o Vanity.o GPU/GPUGenerate.o \
-        hash/ripemd160.o hash/sha256.o hash/sha512.o \
-        hash/ripemd160_sse.o hash/sha256_sse.o Bech32.o Wildcard.o \
-        SegmentSearch.o ProgressManager.o LoadBalancer.o AdaptivePriority.o \
-        KangarooSearch.o AVX512.o AVX512BatchProcessor.o NEON_ARM.o)
+OBJET = $(addprefix $(OBJDIR)/, $(SRC:.cpp=.o))
 
+ifdef gpu
+OBJET += $(OBJDIR)/GPU/GPUEngine.o
 endif
 
 CXX        = g++
@@ -42,9 +37,6 @@ CXXCUDA    = /usr/bin/g++-4.8
 NVCC       = $(CUDA)/bin/nvcc
 # nvcc requires joint notation w/o dot, i.e. "5.2" -> "52"
 ccap       = $(shell echo $(CCAP) | tr -d '.')
-
-# Определение архитектуры
-ARCH := $(shell uname -m)
 
 # Флаги для разных архитектур
 ifeq ($(ARCH),arm64)
