@@ -84,7 +84,7 @@ void AdaptivePriorityManager::RecalculatePriorities() {
   
   for (size_t i = 0; i < sorted.size(); i++) {
     int segId = sorted[i].segmentId;
-    priorities[segId].rank = i + 1;
+    priorities[segId].rank = static_cast<int>(i + 1);
   }
 }
 

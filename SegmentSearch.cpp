@@ -194,7 +194,7 @@ int SegmentSearch::GetSegmentForThread(int threadId) {
   for (size_t i = 0; i < segments.size(); i++) {
     if (segments[i].active) {
       if (activeCount == (threadId % GetActiveSegmentCount())) {
-        return i;
+        return static_cast<int>(i);
       }
       activeCount++;
     }
@@ -520,7 +520,7 @@ void SegmentSearch::EnableLoadBalancing(int numThreads, int rebalanceInterval) {
     loadBalancer = new LoadBalancer();
   }
   
-  loadBalancer->Initialize(segments.size(), numThreads);
+  loadBalancer->Initialize(static_cast<int>(segments.size()), numThreads);
   loadBalancer->SetRebalanceInterval(rebalanceInterval);
   loadBalancer->EnableAdaptiveBalancing(true);
   loadBalancingEnabled = true;
@@ -545,7 +545,7 @@ bool SegmentSearch::PerformRebalance() {
   // Обновить статус завершённых сегментов
   for (size_t i = 0; i < segments.size(); i++) {
     if (!segments[i].active) {
-      loadBalancer->MarkSegmentCompleted(i);
+      loadBalancer->MarkSegmentCompleted(static_cast<int>(i));
     }
   }
   

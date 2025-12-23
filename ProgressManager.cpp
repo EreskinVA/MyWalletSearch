@@ -301,10 +301,10 @@ std::string ProgressManager::FormatTime(time_t t) {
 std::string ProgressManager::FormatDuration(time_t seconds) {
   char buffer[100];
   
-  int days = seconds / 86400;
-  int hours = (seconds % 86400) / 3600;
-  int mins = (seconds % 3600) / 60;
-  int secs = seconds % 60;
+  int days = static_cast<int>(seconds / 86400);
+  int hours = static_cast<int>((seconds % 86400) / 3600);
+  int mins = static_cast<int>((seconds % 3600) / 60);
+  int secs = static_cast<int>(seconds % 60);
   
   if (days > 0) {
     snprintf(buffer, sizeof(buffer), "%d дн %d ч %d мин", days, hours, mins);

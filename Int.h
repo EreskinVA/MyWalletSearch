@@ -271,8 +271,12 @@ static uint64_t inline _udiv128(uint64_t hi, uint64_t lo, uint64_t d,uint64_t *r
   return q;
 }
 
+#ifndef __shiftright128
 #define __shiftright128(a,b,n) ((a)>>(n))|((b)<<(64-(n)))
+#endif
+#ifndef __shiftleft128
 #define __shiftleft128(a,b,n) ((b)<<(n))|((a)>>(64-(n)))
+#endif
 
 #else
 
@@ -309,8 +313,12 @@ static uint64_t inline __rdtsc() {
 #endif
 }
 
+#ifndef __shiftright128
 #define __shiftright128(a,b,n) ((a)>>(n))|((b)<<(64-(n)))
+#endif
+#ifndef __shiftleft128
 #define __shiftleft128(a,b,n) ((b)<<(n))|((a)>>(64-(n)))
+#endif
 
 static inline unsigned char _addcarry_u64(unsigned char c, uint64_t a, uint64_t b, uint64_t *out) {
   unsigned __int128 sum = (unsigned __int128)a + (unsigned __int128)b + (unsigned __int128)c;
@@ -342,6 +350,7 @@ static inline unsigned char subborrow_u64_u64p(unsigned char c, uint64_t a, uint
 #else
 
 // Windows/MSVC
+// Include intrin.h - it provides intrinsics without pulling in all of Windows.h
 #include <intrin.h>
 #define TZC(x) _tzcnt_u64(x)
 #define LZC(x) _lzcnt_u64(x)
@@ -373,8 +382,13 @@ static inline unsigned char subborrow_u64_u64p(unsigned char c, uint64_t a, uint
 // We don't need to define it - it's provided by the compiler
 // If your MSVC version doesn't have it, you'll need to upgrade or use a workaround
 
+// Use Windows SDK definitions if available, otherwise define our own
+#ifndef __shiftright128
 #define __shiftright128(a,b,n) ((a)>>(n))|((b)<<(64-(n)))
+#endif
+#ifndef __shiftleft128
 #define __shiftleft128(a,b,n) ((b)<<(n))|((a)>>(64-(n)))
+#endif
 
 #endif
 
