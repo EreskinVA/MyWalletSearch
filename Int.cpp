@@ -86,16 +86,16 @@ void Int::Set(const Int *a) {
 void Int::Add(Int *a) {
 
   unsigned char c = 0;
-  c = _addcarry_u64(c, bits64[0], a->bits64[0], bits64 +0);
-  c = _addcarry_u64(c, bits64[1], a->bits64[1], bits64 +1);
-  c = _addcarry_u64(c, bits64[2], a->bits64[2], bits64 +2);
-  c = _addcarry_u64(c, bits64[3], a->bits64[3], bits64 +3);
-  c = _addcarry_u64(c, bits64[4], a->bits64[4], bits64 +4);
+  c = addcarry_u64_u64p(c, bits64[0], a->bits64[0], bits64 +0);
+  c = addcarry_u64_u64p(c, bits64[1], a->bits64[1], bits64 +1);
+  c = addcarry_u64_u64p(c, bits64[2], a->bits64[2], bits64 +2);
+  c = addcarry_u64_u64p(c, bits64[3], a->bits64[3], bits64 +3);
+  c = addcarry_u64_u64p(c, bits64[4], a->bits64[4], bits64 +4);
 #if NB64BLOCK > 5
-  c = _addcarry_u64(c, bits64[5], a->bits64[5], bits64 +5);
-  c = _addcarry_u64(c, bits64[6], a->bits64[6], bits64 +6);
-  c = _addcarry_u64(c, bits64[7], a->bits64[7], bits64 +7);
-  c = _addcarry_u64(c, bits64[8], a->bits64[8], bits64 +8);
+  c = addcarry_u64_u64p(c, bits64[5], a->bits64[5], bits64 +5);
+  c = addcarry_u64_u64p(c, bits64[6], a->bits64[6], bits64 +6);
+  c = addcarry_u64_u64p(c, bits64[7], a->bits64[7], bits64 +7);
+  c = addcarry_u64_u64p(c, bits64[8], a->bits64[8], bits64 +8);
 #endif
 
 }
@@ -105,16 +105,16 @@ void Int::Add(Int *a) {
 void Int::Add(uint64_t a) {
 
 	unsigned char c = 0;
-	c = _addcarry_u64(c, bits64[0], a, bits64 + 0);
-	c = _addcarry_u64(c, bits64[1], 0, bits64 + 1);
-	c = _addcarry_u64(c, bits64[2], 0, bits64 + 2);
-	c = _addcarry_u64(c, bits64[3], 0, bits64 + 3);
-	c = _addcarry_u64(c, bits64[4], 0, bits64 + 4);
+	c = addcarry_u64_u64p(c, bits64[0], a, bits64 + 0);
+	c = addcarry_u64_u64p(c, bits64[1], 0, bits64 + 1);
+	c = addcarry_u64_u64p(c, bits64[2], 0, bits64 + 2);
+	c = addcarry_u64_u64p(c, bits64[3], 0, bits64 + 3);
+	c = addcarry_u64_u64p(c, bits64[4], 0, bits64 + 4);
 #if NB64BLOCK > 5
-	c = _addcarry_u64(c, bits64[5], 0, bits64 + 5);
-	c = _addcarry_u64(c, bits64[6], 0, bits64 + 6);
-	c = _addcarry_u64(c, bits64[7], 0, bits64 + 7);
-	c = _addcarry_u64(c, bits64[8], 0, bits64 + 8);
+	c = addcarry_u64_u64p(c, bits64[5], 0, bits64 + 5);
+	c = addcarry_u64_u64p(c, bits64[6], 0, bits64 + 6);
+	c = addcarry_u64_u64p(c, bits64[7], 0, bits64 + 7);
+	c = addcarry_u64_u64p(c, bits64[8], 0, bits64 + 8);
 #endif
 }
 
@@ -122,16 +122,16 @@ void Int::Add(uint64_t a) {
 void Int::AddOne() {
 
   unsigned char c = 0;
-  c = _addcarry_u64(c, bits64[0],1, bits64 +0);
-  c = _addcarry_u64(c, bits64[1],0, bits64 +1);
-  c = _addcarry_u64(c, bits64[2],0, bits64 +2);
-  c = _addcarry_u64(c, bits64[3],0, bits64 +3);
-  c = _addcarry_u64(c, bits64[4],0, bits64 +4);
+  c = addcarry_u64_u64p(c, bits64[0],1, bits64 +0);
+  c = addcarry_u64_u64p(c, bits64[1],0, bits64 +1);
+  c = addcarry_u64_u64p(c, bits64[2],0, bits64 +2);
+  c = addcarry_u64_u64p(c, bits64[3],0, bits64 +3);
+  c = addcarry_u64_u64p(c, bits64[4],0, bits64 +4);
 #if NB64BLOCK > 5
-  c = _addcarry_u64(c, bits64[5],0, bits64 +5);
-  c = _addcarry_u64(c, bits64[6],0, bits64 +6);
-  c = _addcarry_u64(c, bits64[7],0, bits64 +7);
-  c = _addcarry_u64(c, bits64[8],0, bits64 +8);
+  c = addcarry_u64_u64p(c, bits64[5],0, bits64 +5);
+  c = addcarry_u64_u64p(c, bits64[6],0, bits64 +6);
+  c = addcarry_u64_u64p(c, bits64[7],0, bits64 +7);
+  c = addcarry_u64_u64p(c, bits64[8],0, bits64 +8);
 #endif
 
 }
@@ -141,16 +141,16 @@ void Int::AddOne() {
 void Int::Add(Int *a,Int *b) {
 
   unsigned char c = 0;
-  c = _addcarry_u64(c, b->bits64[0], a->bits64[0], bits64 +0);
-  c = _addcarry_u64(c, b->bits64[1], a->bits64[1], bits64 +1);
-  c = _addcarry_u64(c, b->bits64[2], a->bits64[2], bits64 +2);
-  c = _addcarry_u64(c, b->bits64[3], a->bits64[3], bits64 +3);
-  c = _addcarry_u64(c, b->bits64[4], a->bits64[4], bits64 +4);
+  c = addcarry_u64_u64p(c, b->bits64[0], a->bits64[0], bits64 +0);
+  c = addcarry_u64_u64p(c, b->bits64[1], a->bits64[1], bits64 +1);
+  c = addcarry_u64_u64p(c, b->bits64[2], a->bits64[2], bits64 +2);
+  c = addcarry_u64_u64p(c, b->bits64[3], a->bits64[3], bits64 +3);
+  c = addcarry_u64_u64p(c, b->bits64[4], a->bits64[4], bits64 +4);
 #if NB64BLOCK > 5
-  c = _addcarry_u64(c, b->bits64[5], a->bits64[5], bits64 +5);
-  c = _addcarry_u64(c, b->bits64[6], a->bits64[6], bits64 +6);
-  c = _addcarry_u64(c, b->bits64[7], a->bits64[7], bits64 +7);
-  c = _addcarry_u64(c, b->bits64[8], a->bits64[8], bits64 +8);
+  c = addcarry_u64_u64p(c, b->bits64[5], a->bits64[5], bits64 +5);
+  c = addcarry_u64_u64p(c, b->bits64[6], a->bits64[6], bits64 +6);
+  c = addcarry_u64_u64p(c, b->bits64[7], a->bits64[7], bits64 +7);
+  c = addcarry_u64_u64p(c, b->bits64[8], a->bits64[8], bits64 +8);
 #endif
 
 }
@@ -161,18 +161,18 @@ uint64_t Int::AddCh(Int* a,uint64_t ca,Int* b,uint64_t cb) {
 
   uint64_t carry;
   unsigned char c = 0;
-  c = _addcarry_u64(c,a->bits64[0],b->bits64[0],bits64 + 0);
-  c = _addcarry_u64(c,a->bits64[1],b->bits64[1],bits64 + 1);
-  c = _addcarry_u64(c,a->bits64[2],b->bits64[2],bits64 + 2);
-  c = _addcarry_u64(c,a->bits64[3],b->bits64[3],bits64 + 3);
-  c = _addcarry_u64(c,a->bits64[4],b->bits64[4],bits64 + 4);
+  c = addcarry_u64_u64p(c,a->bits64[0],b->bits64[0],bits64 + 0);
+  c = addcarry_u64_u64p(c,a->bits64[1],b->bits64[1],bits64 + 1);
+  c = addcarry_u64_u64p(c,a->bits64[2],b->bits64[2],bits64 + 2);
+  c = addcarry_u64_u64p(c,a->bits64[3],b->bits64[3],bits64 + 3);
+  c = addcarry_u64_u64p(c,a->bits64[4],b->bits64[4],bits64 + 4);
 #if NB64BLOCK > 5
-  c = _addcarry_u64(c,a->bits64[5],b->bits64[5],bits64 + 5);
-  c = _addcarry_u64(c,a->bits64[6],b->bits64[6],bits64 + 6);
-  c = _addcarry_u64(c,a->bits64[7],b->bits64[7],bits64 + 7);
-  c = _addcarry_u64(c,a->bits64[8],b->bits64[8],bits64 + 8);
+  c = addcarry_u64_u64p(c,a->bits64[5],b->bits64[5],bits64 + 5);
+  c = addcarry_u64_u64p(c,a->bits64[6],b->bits64[6],bits64 + 6);
+  c = addcarry_u64_u64p(c,a->bits64[7],b->bits64[7],bits64 + 7);
+  c = addcarry_u64_u64p(c,a->bits64[8],b->bits64[8],bits64 + 8);
 #endif
-  _addcarry_u64(c,ca,cb,&carry);
+  addcarry_u64_u64p(c,ca,cb,&carry);
   return carry;
 
 }
@@ -181,18 +181,18 @@ uint64_t Int::AddCh(Int* a,uint64_t ca) {
 
   uint64_t carry;
   unsigned char c = 0;
-  c = _addcarry_u64(c,bits64[0],a->bits64[0],bits64 + 0);
-  c = _addcarry_u64(c,bits64[1],a->bits64[1],bits64 + 1);
-  c = _addcarry_u64(c,bits64[2],a->bits64[2],bits64 + 2);
-  c = _addcarry_u64(c,bits64[3],a->bits64[3],bits64 + 3);
-  c = _addcarry_u64(c,bits64[4],a->bits64[4],bits64 + 4);
+  c = addcarry_u64_u64p(c,bits64[0],a->bits64[0],bits64 + 0);
+  c = addcarry_u64_u64p(c,bits64[1],a->bits64[1],bits64 + 1);
+  c = addcarry_u64_u64p(c,bits64[2],a->bits64[2],bits64 + 2);
+  c = addcarry_u64_u64p(c,bits64[3],a->bits64[3],bits64 + 3);
+  c = addcarry_u64_u64p(c,bits64[4],a->bits64[4],bits64 + 4);
 #if NB64BLOCK > 5
-  c = _addcarry_u64(c,bits64[5],a->bits64[5],bits64 + 5);
-  c = _addcarry_u64(c,bits64[6],a->bits64[6],bits64 + 6);
-  c = _addcarry_u64(c,bits64[7],a->bits64[7],bits64 + 7);
-  c = _addcarry_u64(c,bits64[8],a->bits64[8],bits64 + 8);
+  c = addcarry_u64_u64p(c,bits64[5],a->bits64[5],bits64 + 5);
+  c = addcarry_u64_u64p(c,bits64[6],a->bits64[6],bits64 + 6);
+  c = addcarry_u64_u64p(c,bits64[7],a->bits64[7],bits64 + 7);
+  c = addcarry_u64_u64p(c,bits64[8],a->bits64[8],bits64 + 8);
 #endif
-  _addcarry_u64(c,ca,0,&carry);
+  addcarry_u64_u64p(c,ca,0,&carry);
   return carry;
 
 }
@@ -201,16 +201,16 @@ uint64_t Int::AddCh(Int* a,uint64_t ca) {
 uint64_t Int::AddC(Int* a) {
 
   unsigned char c = 0;
-  c = _addcarry_u64(c,bits64[0],a->bits64[0],bits64 + 0);
-  c = _addcarry_u64(c,bits64[1],a->bits64[1],bits64 + 1);
-  c = _addcarry_u64(c,bits64[2],a->bits64[2],bits64 + 2);
-  c = _addcarry_u64(c,bits64[3],a->bits64[3],bits64 + 3);
-  c = _addcarry_u64(c,bits64[4],a->bits64[4],bits64 + 4);
+  c = addcarry_u64_u64p(c,bits64[0],a->bits64[0],bits64 + 0);
+  c = addcarry_u64_u64p(c,bits64[1],a->bits64[1],bits64 + 1);
+  c = addcarry_u64_u64p(c,bits64[2],a->bits64[2],bits64 + 2);
+  c = addcarry_u64_u64p(c,bits64[3],a->bits64[3],bits64 + 3);
+  c = addcarry_u64_u64p(c,bits64[4],a->bits64[4],bits64 + 4);
 #if NB64BLOCK > 5
-  c = _addcarry_u64(c,bits64[5],a->bits64[5],bits64 + 5);
-  c = _addcarry_u64(c,bits64[6],a->bits64[6],bits64 + 6);
-  c = _addcarry_u64(c,bits64[7],a->bits64[7],bits64 + 7);
-  c = _addcarry_u64(c,bits64[8],a->bits64[8],bits64 + 8);
+  c = addcarry_u64_u64p(c,bits64[5],a->bits64[5],bits64 + 5);
+  c = addcarry_u64_u64p(c,bits64[6],a->bits64[6],bits64 + 6);
+  c = addcarry_u64_u64p(c,bits64[7],a->bits64[7],bits64 + 7);
+  c = addcarry_u64_u64p(c,bits64[8],a->bits64[8],bits64 + 8);
 #endif
 
   return c;
@@ -222,16 +222,16 @@ uint64_t Int::AddC(Int* a) {
 void Int::AddAndShift(Int* a,Int* b,uint64_t cH) {
 
   unsigned char c = 0;
-  c = _addcarry_u64(c,b->bits64[0],a->bits64[0],bits64 + 0);
-  c = _addcarry_u64(c,b->bits64[1],a->bits64[1],bits64 + 0);
-  c = _addcarry_u64(c,b->bits64[2],a->bits64[2],bits64 + 1);
-  c = _addcarry_u64(c,b->bits64[3],a->bits64[3],bits64 + 2);
-  c = _addcarry_u64(c,b->bits64[4],a->bits64[4],bits64 + 3);
+  c = addcarry_u64_u64p(c,b->bits64[0],a->bits64[0],bits64 + 0);
+  c = addcarry_u64_u64p(c,b->bits64[1],a->bits64[1],bits64 + 0);
+  c = addcarry_u64_u64p(c,b->bits64[2],a->bits64[2],bits64 + 1);
+  c = addcarry_u64_u64p(c,b->bits64[3],a->bits64[3],bits64 + 2);
+  c = addcarry_u64_u64p(c,b->bits64[4],a->bits64[4],bits64 + 3);
 #if NB64BLOCK > 5
-  c = _addcarry_u64(c,b->bits64[5],a->bits64[5],bits64 + 4);
-  c = _addcarry_u64(c,b->bits64[6],a->bits64[6],bits64 + 5);
-  c = _addcarry_u64(c,b->bits64[7],a->bits64[7],bits64 + 6);
-  c = _addcarry_u64(c,b->bits64[8],a->bits64[8],bits64 + 7);
+  c = addcarry_u64_u64p(c,b->bits64[5],a->bits64[5],bits64 + 4);
+  c = addcarry_u64_u64p(c,b->bits64[6],a->bits64[6],bits64 + 5);
+  c = addcarry_u64_u64p(c,b->bits64[7],a->bits64[7],bits64 + 6);
+  c = addcarry_u64_u64p(c,b->bits64[8],a->bits64[8],bits64 + 7);
 #endif
 
   bits64[NB64BLOCK - 1] = c + cH;
@@ -285,11 +285,11 @@ void Int::MatrixVecMul(Int* u,Int* v,int64_t _11,int64_t _12,int64_t _21,int64_t
   uint64_t h4,carry4;
 
   // Compute -u,-v
-  c1 = _subborrow_u64(0,0,u->bits64[0],nu.bits64 + 0);
-  c2 = _subborrow_u64(0,0,v->bits64[0],nv.bits64 + 0);
+  c1 = subborrow_u64_u64p(0,0,u->bits64[0],nu.bits64 + 0);
+  c2 = subborrow_u64_u64p(0,0,v->bits64[0],nv.bits64 + 0);
   for(int i = 1; i <= len; i++) {
-    c1 = _subborrow_u64(c1,0,u->bits64[i],nu.bits64 + i);
-    c2 = _subborrow_u64(c2,0,v->bits64[i],nv.bits64 + i);
+    c1 = subborrow_u64_u64p(c1,0,u->bits64[i],nu.bits64 + i);
+    c2 = subborrow_u64_u64p(c2,0,v->bits64[i],nv.bits64 + i);
   }
 
   // Make _XY positive
@@ -326,17 +326,17 @@ void Int::MatrixVecMul(Int* u,Int* v,int64_t _11,int64_t _12,int64_t _21,int64_t
   c1 = 0; c2 = 0; c3 = 0; c4 = 0;
 
   for(int i = 1; i <= len; i++) {
-    c1 = _addcarry_u64(c1,_umul128(du1->bits64[i],_11,&h1),carry1,t1.bits64 + i); carry1 = h1;
-    c2 = _addcarry_u64(c2,_umul128(dv1->bits64[i],_12,&h2),carry2,t2.bits64 + i); carry2 = h2;
-    c3 = _addcarry_u64(c3,_umul128(du2->bits64[i],_21,&h3),carry3,t3.bits64 + i); carry3 = h3;
-    c4 = _addcarry_u64(c4,_umul128(dv2->bits64[i],_22,&h4),carry4,t4.bits64 + i); carry4 = h4;
+    c1 = addcarry_u64_u64p(c1,_umul128(du1->bits64[i],_11,&h1),carry1,t1.bits64 + i); carry1 = h1;
+    c2 = addcarry_u64_u64p(c2,_umul128(dv1->bits64[i],_12,&h2),carry2,t2.bits64 + i); carry2 = h2;
+    c3 = addcarry_u64_u64p(c3,_umul128(du2->bits64[i],_21,&h3),carry3,t3.bits64 + i); carry3 = h3;
+    c4 = addcarry_u64_u64p(c4,_umul128(dv2->bits64[i],_22,&h4),carry4,t4.bits64 + i); carry4 = h4;
   }
 
   // Add
   c1 = 0; c2 = 0;
   for(int i = 0; i <= len; i++) {
-    c1 = _addcarry_u64(c1,t1.bits64[i],t2.bits64[i],u->bits64 + i);
-    c2 = _addcarry_u64(c2,t3.bits64[i],t4.bits64[i],v->bits64 + i);
+    c1 = addcarry_u64_u64p(c1,t1.bits64[i],t2.bits64[i],u->bits64 + i);
+    c2 = addcarry_u64_u64p(c2,t3.bits64[i],t4.bits64[i],v->bits64 + i);
   }
 
   *negu = (int64_t)u->bits64[len] < 0;
@@ -345,13 +345,13 @@ void Int::MatrixVecMul(Int* u,Int* v,int64_t _11,int64_t _12,int64_t _21,int64_t
   if( *negu ) {
     c1 = 0;
     for(int i = 0; i <= len; i++)
-      c1 = _subborrow_u64(c1,0,u->bits64[i],u->bits64 + i);
+      c1 = subborrow_u64_u64p(c1,0,u->bits64[i],u->bits64 + i);
   }
 
   if( *negv ) {
     c1 = 0;
     for(int i = 0; i <= len; i++)
-      c1 = _subborrow_u64(c1,0,v->bits64[i],v->bits64 + i);
+      c1 = subborrow_u64_u64p(c1,0,v->bits64[i],v->bits64 + i);
   }
 
 
@@ -532,16 +532,16 @@ void Int::SetQWord(int n, uint64_t b) {
 void Int::Sub(Int *a) {
 
   unsigned char c = 0;
-  c = _subborrow_u64(c, bits64[0], a->bits64[0], bits64 +0);
-  c = _subborrow_u64(c, bits64[1], a->bits64[1], bits64 +1);
-  c = _subborrow_u64(c, bits64[2], a->bits64[2], bits64 +2);
-  c = _subborrow_u64(c, bits64[3], a->bits64[3], bits64 +3);
-  c = _subborrow_u64(c, bits64[4], a->bits64[4], bits64 +4);
+  c = subborrow_u64_u64p(c, bits64[0], a->bits64[0], bits64 +0);
+  c = subborrow_u64_u64p(c, bits64[1], a->bits64[1], bits64 +1);
+  c = subborrow_u64_u64p(c, bits64[2], a->bits64[2], bits64 +2);
+  c = subborrow_u64_u64p(c, bits64[3], a->bits64[3], bits64 +3);
+  c = subborrow_u64_u64p(c, bits64[4], a->bits64[4], bits64 +4);
 #if NB64BLOCK > 5
-  c = _subborrow_u64(c, bits64[5], a->bits64[5], bits64 +5);
-  c = _subborrow_u64(c, bits64[6], a->bits64[6], bits64 +6);
-  c = _subborrow_u64(c, bits64[7], a->bits64[7], bits64 +7);
-  c = _subborrow_u64(c, bits64[8], a->bits64[8], bits64 +8);
+  c = subborrow_u64_u64p(c, bits64[5], a->bits64[5], bits64 +5);
+  c = subborrow_u64_u64p(c, bits64[6], a->bits64[6], bits64 +6);
+  c = subborrow_u64_u64p(c, bits64[7], a->bits64[7], bits64 +7);
+  c = subborrow_u64_u64p(c, bits64[8], a->bits64[8], bits64 +8);
 #endif
 
 }
@@ -551,16 +551,16 @@ void Int::Sub(Int *a) {
 void Int::Sub(Int *a,Int *b) {
 
   unsigned char c = 0;
-  c = _subborrow_u64(c, a->bits64[0], b->bits64[0], bits64 + 0);
-  c = _subborrow_u64(c, a->bits64[1], b->bits64[1], bits64 + 1);
-  c = _subborrow_u64(c, a->bits64[2], b->bits64[2], bits64 + 2);
-  c = _subborrow_u64(c, a->bits64[3], b->bits64[3], bits64 + 3);
-  c = _subborrow_u64(c, a->bits64[4], b->bits64[4], bits64 + 4);
+  c = subborrow_u64_u64p(c, a->bits64[0], b->bits64[0], bits64 + 0);
+  c = subborrow_u64_u64p(c, a->bits64[1], b->bits64[1], bits64 + 1);
+  c = subborrow_u64_u64p(c, a->bits64[2], b->bits64[2], bits64 + 2);
+  c = subborrow_u64_u64p(c, a->bits64[3], b->bits64[3], bits64 + 3);
+  c = subborrow_u64_u64p(c, a->bits64[4], b->bits64[4], bits64 + 4);
 #if NB64BLOCK > 5
-  c = _subborrow_u64(c, a->bits64[5], b->bits64[5], bits64 + 5);
-  c = _subborrow_u64(c, a->bits64[6], b->bits64[6], bits64 + 6);
-  c = _subborrow_u64(c, a->bits64[7], b->bits64[7], bits64 + 7);
-  c = _subborrow_u64(c, a->bits64[8], b->bits64[8], bits64 + 8);
+  c = subborrow_u64_u64p(c, a->bits64[5], b->bits64[5], bits64 + 5);
+  c = subborrow_u64_u64p(c, a->bits64[6], b->bits64[6], bits64 + 6);
+  c = subborrow_u64_u64p(c, a->bits64[7], b->bits64[7], bits64 + 7);
+  c = subborrow_u64_u64p(c, a->bits64[8], b->bits64[8], bits64 + 8);
 #endif
 
 }
@@ -568,16 +568,16 @@ void Int::Sub(Int *a,Int *b) {
 void Int::Sub(uint64_t a) {
 
   unsigned char c = 0;
-  c = _subborrow_u64(c, bits64[0], a, bits64 + 0);
-  c = _subborrow_u64(c, bits64[1], 0, bits64 + 1);
-  c = _subborrow_u64(c, bits64[2], 0, bits64 + 2);
-  c = _subborrow_u64(c, bits64[3], 0, bits64 + 3);
-  c = _subborrow_u64(c, bits64[4], 0, bits64 + 4);
+  c = subborrow_u64_u64p(c, bits64[0], a, bits64 + 0);
+  c = subborrow_u64_u64p(c, bits64[1], 0, bits64 + 1);
+  c = subborrow_u64_u64p(c, bits64[2], 0, bits64 + 2);
+  c = subborrow_u64_u64p(c, bits64[3], 0, bits64 + 3);
+  c = subborrow_u64_u64p(c, bits64[4], 0, bits64 + 4);
 #if NB64BLOCK > 5
-  c = _subborrow_u64(c, bits64[5], 0, bits64 + 5);
-  c = _subborrow_u64(c, bits64[6], 0, bits64 + 6);
-  c = _subborrow_u64(c, bits64[7], 0, bits64 + 7);
-  c = _subborrow_u64(c, bits64[8], 0, bits64 + 8);
+  c = subborrow_u64_u64p(c, bits64[5], 0, bits64 + 5);
+  c = subborrow_u64_u64p(c, bits64[6], 0, bits64 + 6);
+  c = subborrow_u64_u64p(c, bits64[7], 0, bits64 + 7);
+  c = subborrow_u64_u64p(c, bits64[8], 0, bits64 + 8);
 #endif
 
 }
@@ -585,16 +585,16 @@ void Int::Sub(uint64_t a) {
 void Int::SubOne() {
 
   unsigned char c = 0;
-  c = _subborrow_u64(c, bits64[0], 1, bits64 + 0);
-  c = _subborrow_u64(c, bits64[1], 0, bits64 + 1);
-  c = _subborrow_u64(c, bits64[2], 0, bits64 + 2);
-  c = _subborrow_u64(c, bits64[3], 0, bits64 + 3);
-  c = _subborrow_u64(c, bits64[4], 0, bits64 + 4);
+  c = subborrow_u64_u64p(c, bits64[0], 1, bits64 + 0);
+  c = subborrow_u64_u64p(c, bits64[1], 0, bits64 + 1);
+  c = subborrow_u64_u64p(c, bits64[2], 0, bits64 + 2);
+  c = subborrow_u64_u64p(c, bits64[3], 0, bits64 + 3);
+  c = subborrow_u64_u64p(c, bits64[4], 0, bits64 + 4);
 #if NB64BLOCK > 5
-  c = _subborrow_u64(c, bits64[5], 0, bits64 + 5);
-  c = _subborrow_u64(c, bits64[6], 0, bits64 + 6);
-  c = _subborrow_u64(c, bits64[7], 0, bits64 + 7);
-  c = _subborrow_u64(c, bits64[8], 0, bits64 + 8);
+  c = subborrow_u64_u64p(c, bits64[5], 0, bits64 + 5);
+  c = subborrow_u64_u64p(c, bits64[6], 0, bits64 + 6);
+  c = subborrow_u64_u64p(c, bits64[7], 0, bits64 + 7);
+  c = subborrow_u64_u64p(c, bits64[8], 0, bits64 + 8);
 #endif
 
 }
@@ -637,16 +637,16 @@ bool Int::IsOdd() {
 void Int::Neg() {
 
 	unsigned char c=0;
-	c = _subborrow_u64(c, 0, bits64[0], bits64 + 0);
-	c = _subborrow_u64(c, 0, bits64[1], bits64 + 1);
-	c = _subborrow_u64(c, 0, bits64[2], bits64 + 2);
-	c = _subborrow_u64(c, 0, bits64[3], bits64 + 3);
-	c = _subborrow_u64(c, 0, bits64[4], bits64 + 4);
+	c = subborrow_u64_u64p(c, 0, bits64[0], bits64 + 0);
+	c = subborrow_u64_u64p(c, 0, bits64[1], bits64 + 1);
+	c = subborrow_u64_u64p(c, 0, bits64[2], bits64 + 2);
+	c = subborrow_u64_u64p(c, 0, bits64[3], bits64 + 3);
+	c = subborrow_u64_u64p(c, 0, bits64[4], bits64 + 4);
 #if NB64BLOCK > 5
-	c = _subborrow_u64(c, 0, bits64[5], bits64 + 5);
-	c = _subborrow_u64(c, 0, bits64[6], bits64 + 6);
-	c = _subborrow_u64(c, 0, bits64[7], bits64 + 7);
-	c = _subborrow_u64(c, 0, bits64[8], bits64 + 8);
+	c = subborrow_u64_u64p(c, 0, bits64[5], bits64 + 5);
+	c = subborrow_u64_u64p(c, 0, bits64[6], bits64 + 6);
+	c = subborrow_u64_u64p(c, 0, bits64[7], bits64 + 7);
+	c = subborrow_u64_u64p(c, 0, bits64[8], bits64 + 8);
 #endif
 
 }
@@ -814,16 +814,16 @@ uint64_t Int::IMult(Int *a, int64_t b) {
   if (b < 0LL) {
 
     unsigned char c = 0;
-    c = _subborrow_u64(c,0,a->bits64[0],(unsigned long long *)(bits64 + 0));
-    c = _subborrow_u64(c,0,a->bits64[1],(unsigned long long *)(bits64 + 1));
-    c = _subborrow_u64(c,0,a->bits64[2],(unsigned long long *)(bits64 + 2));
-    c = _subborrow_u64(c,0,a->bits64[3],(unsigned long long *)(bits64 + 3));
-    c = _subborrow_u64(c,0,a->bits64[4],(unsigned long long *)(bits64 + 4));
+    c = subborrow_u64_u64p(c,0,a->bits64[0],bits64 + 0);
+    c = subborrow_u64_u64p(c,0,a->bits64[1],bits64 + 1);
+    c = subborrow_u64_u64p(c,0,a->bits64[2],bits64 + 2);
+    c = subborrow_u64_u64p(c,0,a->bits64[3],bits64 + 3);
+    c = subborrow_u64_u64p(c,0,a->bits64[4],bits64 + 4);
 #if NB64BLOCK > 5
-    c = _subborrow_u64(c,0,a->bits64[5],(unsigned long long *)(bits64 + 5));
-    c = _subborrow_u64(c,0,a->bits64[6],(unsigned long long *)(bits64 + 6));
-    c = _subborrow_u64(c,0,a->bits64[7],(unsigned long long *)(bits64 + 7));
-    c = _subborrow_u64(c,0,a->bits64[8],(unsigned long long *)(bits64 + 8));
+    c = subborrow_u64_u64p(c,0,a->bits64[5],bits64 + 5);
+    c = subborrow_u64_u64p(c,0,a->bits64[6],bits64 + 6);
+    c = subborrow_u64_u64p(c,0,a->bits64[7],bits64 + 7);
+    c = subborrow_u64_u64p(c,0,a->bits64[8],bits64 + 8);
 #endif
 
   	b = -b;
@@ -864,9 +864,9 @@ void Int::Mult(Int *a,Int *b) {
 
   for (int i = 1; i < NB64BLOCK; i++) {
     for (int j = 0; j <= i; j++) {
-      c = _addcarry_u64(c, _umul128(a->bits64[j], b->bits64[i - j], &h), pr, (unsigned long long *)&pr);
-      c = _addcarry_u64(c, carryl, h, (unsigned long long *)&carryl);
-      c = _addcarry_u64(c, carryh, 0, (unsigned long long *)&carryh);
+      c = addcarry_u64_u64p(c, _umul128(a->bits64[j], b->bits64[i - j], &h), pr, &pr);
+      c = addcarry_u64_u64p(c, carryl, h, &carryl);
+      c = addcarry_u64_u64p(c, carryh, 0, &carryh);
     }
     bits64[i] = pr;
     pr = carryl;

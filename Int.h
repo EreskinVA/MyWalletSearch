@@ -226,6 +226,26 @@ private:
 // заголовки GCC/Clang (adxintrin.h), которые объявляют одноимённые inline-функции.
 #include <immintrin.h>
 
+// ------------------------------------------------------------------
+// Unified wrappers: always accept uint64_t* out-params.
+// On some platforms uint64_t is 'unsigned long' (not 'unsigned long long'),
+// while intrinsics expect 'unsigned long long*'. We normalize here to avoid
+// sprinkling casts all over the codebase.
+// ------------------------------------------------------------------
+static inline unsigned char addcarry_u64_u64p(unsigned char c, uint64_t a, uint64_t b, uint64_t *out) {
+  return _addcarry_u64(c,
+                       (unsigned long long)a,
+                       (unsigned long long)b,
+                       (unsigned long long *)out);
+}
+
+static inline unsigned char subborrow_u64_u64p(unsigned char c, uint64_t a, uint64_t b, uint64_t *out) {
+  return _subborrow_u64(c,
+                        (unsigned long long)a,
+                        (unsigned long long)b,
+                        (unsigned long long *)out);
+}
+
 // Missing intrinsics (x86/x64)
 static uint64_t inline _umul128(uint64_t a, uint64_t b, uint64_t *h) {
   uint64_t rhi;
@@ -305,6 +325,14 @@ static inline unsigned char _subborrow_u64(unsigned char c, uint64_t a, uint64_t
   return borrow;
 }
 
+static inline unsigned char addcarry_u64_u64p(unsigned char c, uint64_t a, uint64_t b, uint64_t *out) {
+  return _addcarry_u64(c, a, b, out);
+}
+
+static inline unsigned char subborrow_u64_u64p(unsigned char c, uint64_t a, uint64_t b, uint64_t *out) {
+  return _subborrow_u64(c, a, b, out);
+}
+
 #endif
 
 #define _byteswap_uint64 __builtin_bswap64
@@ -332,15 +360,15 @@ static void inline imm_mul(uint64_t *x, uint64_t y, uint64_t *dst,uint64_t *carr
   unsigned char c = 0;
   uint64_t h, carry;
   dst[0] = _umul128(x[0], y, &h); carry = h;
-  c = _addcarry_u64(c, _umul128(x[1], y, &h), carry, (unsigned long long *)(dst + 1)); carry = h;
-  c = _addcarry_u64(c, _umul128(x[2], y, &h), carry, (unsigned long long *)(dst + 2)); carry = h;
-  c = _addcarry_u64(c, _umul128(x[3], y, &h), carry, (unsigned long long *)(dst + 3)); carry = h;
-  c = _addcarry_u64(c, _umul128(x[4], y, &h), carry, (unsigned long long *)(dst + 4)); carry = h;
+  c = addcarry_u64_u64p(c, _umul128(x[1], y, &h), carry, dst + 1); carry = h;
+  c = addcarry_u64_u64p(c, _umul128(x[2], y, &h), carry, dst + 2); carry = h;
+  c = addcarry_u64_u64p(c, _umul128(x[3], y, &h), carry, dst + 3); carry = h;
+  c = addcarry_u64_u64p(c, _umul128(x[4], y, &h), carry, dst + 4); carry = h;
 #if NB64BLOCK > 5
-  c = _addcarry_u64(c, _umul128(x[5], y, &h), carry, (unsigned long long *)(dst + 5)); carry = h;
-  c = _addcarry_u64(c, _umul128(x[6], y, &h), carry, (unsigned long long *)(dst + 6)); carry = h;
-  c = _addcarry_u64(c, _umul128(x[7], y, &h), carry, (unsigned long long *)(dst + 7)); carry = h;
-  c = _addcarry_u64(c, _umul128(x[8], y, &h), carry, (unsigned long long *)(dst + 8)); carry = h;
+  c = addcarry_u64_u64p(c, _umul128(x[5], y, &h), carry, dst + 5); carry = h;
+  c = addcarry_u64_u64p(c, _umul128(x[6], y, &h), carry, dst + 6); carry = h;
+  c = addcarry_u64_u64p(c, _umul128(x[7], y, &h), carry, dst + 7); carry = h;
+  c = addcarry_u64_u64p(c, _umul128(x[8], y, &h), carry, dst + 8); carry = h;
 #endif
   *carryH = carry;
 
@@ -351,16 +379,16 @@ static void inline imm_imul(uint64_t* x,uint64_t y,uint64_t* dst,uint64_t* carry
   unsigned char c = 0;
   uint64_t h,carry;
   dst[0] = _umul128(x[0],y,&h); carry = h;
-  c = _addcarry_u64(c,_umul128(x[1],y,&h),carry,(unsigned long long *)(dst + 1)); carry = h;
-  c = _addcarry_u64(c,_umul128(x[2],y,&h),carry,(unsigned long long *)(dst + 2)); carry = h;
-  c = _addcarry_u64(c,_umul128(x[3],y,&h),carry,(unsigned long long *)(dst + 3)); carry = h;
+  c = addcarry_u64_u64p(c,_umul128(x[1],y,&h),carry,dst + 1); carry = h;
+  c = addcarry_u64_u64p(c,_umul128(x[2],y,&h),carry,dst + 2); carry = h;
+  c = addcarry_u64_u64p(c,_umul128(x[3],y,&h),carry,dst + 3); carry = h;
 #if NB64BLOCK > 5
-  c = _addcarry_u64(c,_umul128(x[4],y,&h),carry,(unsigned long long *)(dst + 4)); carry = h;
-  c = _addcarry_u64(c,_umul128(x[5],y,&h),carry,(unsigned long long *)(dst + 5)); carry = h;
-  c = _addcarry_u64(c,_umul128(x[6],y,&h),carry,(unsigned long long *)(dst + 6)); carry = h;
-  c = _addcarry_u64(c,_umul128(x[7],y,&h),carry,(unsigned long long *)(dst + 7)); carry = h;
+  c = addcarry_u64_u64p(c,_umul128(x[4],y,&h),carry,dst + 4); carry = h;
+  c = addcarry_u64_u64p(c,_umul128(x[5],y,&h),carry,dst + 5); carry = h;
+  c = addcarry_u64_u64p(c,_umul128(x[6],y,&h),carry,dst + 6); carry = h;
+  c = addcarry_u64_u64p(c,_umul128(x[7],y,&h),carry,dst + 7); carry = h;
 #endif
-  c = _addcarry_u64(c,_mul128(x[NB64BLOCK - 1],y,(int64_t*)&h),carry,(unsigned long long *)(dst + NB64BLOCK - 1)); carry = h;
+  c = addcarry_u64_u64p(c,_mul128(x[NB64BLOCK - 1],y,(int64_t*)&h),carry,dst + NB64BLOCK - 1); carry = h;
   * carryH = carry;
 
 }
@@ -371,16 +399,16 @@ static void inline imm_umul(uint64_t *x, uint64_t y, uint64_t *dst) {
   unsigned char c = 0;
   uint64_t h, carry;
   dst[0] = _umul128(x[0], y, &h); carry = h;
-  c = _addcarry_u64(c, _umul128(x[1], y, &h), carry, (unsigned long long *)(dst + 1)); carry = h;
-  c = _addcarry_u64(c, _umul128(x[2], y, &h), carry, (unsigned long long *)(dst + 2)); carry = h;
-  c = _addcarry_u64(c, _umul128(x[3], y, &h), carry, (unsigned long long *)(dst + 3)); carry = h;
+  c = addcarry_u64_u64p(c, _umul128(x[1], y, &h), carry, dst + 1); carry = h;
+  c = addcarry_u64_u64p(c, _umul128(x[2], y, &h), carry, dst + 2); carry = h;
+  c = addcarry_u64_u64p(c, _umul128(x[3], y, &h), carry, dst + 3); carry = h;
 #if NB64BLOCK > 5
-  c = _addcarry_u64(c, _umul128(x[4], y, &h), carry, (unsigned long long *)(dst + 4)); carry = h;
-  c = _addcarry_u64(c, _umul128(x[5], y, &h), carry, (unsigned long long *)(dst + 5)); carry = h;
-  c = _addcarry_u64(c, _umul128(x[6], y, &h), carry, (unsigned long long *)(dst + 6)); carry = h;
-  c = _addcarry_u64(c, _umul128(x[7], y, &h), carry, (unsigned long long *)(dst + 7)); carry = h;
+  c = addcarry_u64_u64p(c, _umul128(x[4], y, &h), carry, dst + 4); carry = h;
+  c = addcarry_u64_u64p(c, _umul128(x[5], y, &h), carry, dst + 5); carry = h;
+  c = addcarry_u64_u64p(c, _umul128(x[6], y, &h), carry, dst + 6); carry = h;
+  c = addcarry_u64_u64p(c, _umul128(x[7], y, &h), carry, dst + 7); carry = h;
 #endif
-  _addcarry_u64(c, 0ULL, carry, (unsigned long long *)(dst + (NB64BLOCK - 1)));
+  addcarry_u64_u64p(c, 0ULL, carry, dst + (NB64BLOCK - 1));
 
 }
 
