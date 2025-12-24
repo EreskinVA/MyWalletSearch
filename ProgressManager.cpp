@@ -9,6 +9,8 @@
 #include <iostream>
 #include <ctime>
 #include <sys/stat.h>
+#include <cstdint>
+#include <limits>
 
 #define PROGRESS_FILE_VERSION 1
 
@@ -46,12 +48,37 @@ SearchProgress ProgressManager::CreateProgress(int bitRange, const std::string &
 void ProgressManager::UpdateSegmentProgress(SearchProgress &progress, int segmentIndex,
                                              const Int &currentKey, uint64_t keysChecked) {
   if (segmentIndex >= 0 && segmentIndex < (int)progress.segments.size()) {
+    // Безопасное копирование Int
     Int tempKey;
-    tempKey.Set((Int*)&currentKey);
+    tempKey.Set(&currentKey);
     progress.segments[segmentIndex].currentKey = tempKey.GetBase16();
-    progress.segments[segmentIndex].keysChecked = keysChecked;
+    
+    // Накапливаем keysChecked (не заменяем, а добавляем)
+    // Защита от переполнения
+    uint64_t oldKeys = progress.segments[segmentIndex].keysChecked;
+    uint64_t newKeys = oldKeys + keysChecked;
+    
+    // Проверка на переполнение
+    if (newKeys < oldKeys) {
+      // Переполнение - устанавливаем максимальное значение
+      progress.segments[segmentIndex].keysChecked = std::numeric_limits<uint64_t>::max();
+    } else {
+      progress.segments[segmentIndex].keysChecked = newKeys;
+    }
+    
     progress.segments[segmentIndex].lastUpdate = time(NULL);
-    progress.totalKeysChecked += keysChecked;
+    
+    // Обновляем общий счетчик (только инкремент, чтобы избежать двойного подсчета)
+    uint64_t increment = progress.segments[segmentIndex].keysChecked - oldKeys;
+    uint64_t newTotal = progress.totalKeysChecked + increment;
+    
+    // Защита от переполнения общего счетчика
+    if (newTotal < progress.totalKeysChecked) {
+      progress.totalKeysChecked = std::numeric_limits<uint64_t>::max();
+    } else {
+      progress.totalKeysChecked = newTotal;
+    }
+    
     progress.lastSaveTime = time(NULL);
   }
 }

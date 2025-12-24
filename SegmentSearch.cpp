@@ -346,6 +346,11 @@ bool SegmentSearch::SaveProgress(const std::string &targetAddress) {
     return false;
   }
   
+  // Инициализация прогресса при первом сохранении
+  if (currentProgress.segments.empty() && !segments.empty()) {
+    currentProgress = progressManager->CreateProgress(bitRange, targetAddress);
+  }
+  
   ExportToProgress();
   currentProgress.targetAddress = targetAddress;
   currentProgress.lastSaveTime = time(NULL);
@@ -424,20 +429,28 @@ bool SegmentSearch::ShouldAutoSave() {
 
 void SegmentSearch::ExportToProgress() {
   currentProgress.bitRange = bitRange;
-  currentProgress.segments.clear();
-  
+  // НЕ очищаем segments - сохраняем существующие значения keysChecked
+  // Обновляем только изменяемые поля
   for (size_t i = 0; i < segments.size(); i++) {
-    SegmentProgress sp;
-    sp.name = segments[i].name;
-    sp.startPercent = segments[i].startPercent;
-    sp.endPercent = segments[i].endPercent;
-    sp.direction = (segments[i].direction == DIRECTION_UP) ? 0 : 1;
-    sp.currentKey = segments[i].currentKey.GetBase16();
-    sp.active = segments[i].active;
-    sp.keysChecked = 0;  // Будет обновлено при UpdateProgress
-    sp.lastUpdate = time(NULL);
-    
-    currentProgress.segments.push_back(sp);
+    if (i < currentProgress.segments.size()) {
+      // Обновляем существующий сегмент
+      currentProgress.segments[i].currentKey = segments[i].currentKey.GetBase16();
+      currentProgress.segments[i].active = segments[i].active;
+      currentProgress.segments[i].lastUpdate = time(NULL);
+      // keysChecked сохраняем из текущего прогресса (не сбрасываем!)
+    } else {
+      // Создаем новый сегмент
+      SegmentProgress sp;
+      sp.name = segments[i].name;
+      sp.startPercent = segments[i].startPercent;
+      sp.endPercent = segments[i].endPercent;
+      sp.direction = (segments[i].direction == DIRECTION_UP) ? 0 : 1;
+      sp.currentKey = segments[i].currentKey.GetBase16();
+      sp.active = segments[i].active;
+      sp.keysChecked = 0;  // Только для новых сегментов
+      sp.lastUpdate = time(NULL);
+      currentProgress.segments.push_back(sp);
+    }
   }
 }
 
