@@ -20,12 +20,11 @@
 #include <stdio.h>
 #endif
 
+#include <stdint.h>
 #include "GPUGroup.h"
 #include "GPUEngine.h"
 #include <cuda.h>
 #include <cuda_runtime.h>
-
-#include <stdint.h>
 #include <stdlib.h>
 #include "../hash/sha256.h"
 #include "../hash/ripemd160.h"
