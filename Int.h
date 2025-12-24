@@ -345,6 +345,41 @@ static inline unsigned char subborrow_u64_u64p(unsigned char c, uint64_t a, uint
 #define TZC(x) _tzcnt_u64(x)
 #define LZC(x) _lzcnt_u64(x)
 
+// ------------------------------------------------------------------
+// Unified wrappers for Windows builds (MSVC + NVCC).
+//
+// CUDA 13.x uses NVCC+MSVC for host compilation. The original code relies on
+// addcarry_u64_u64p/subborrow_u64_u64p wrappers on non-Windows, but Windows
+// path didn't define them, which breaks CUDA compilation of GPUEngine.cu.
+//
+// Additionally, when NVCC compiles device code, MSVC intrinsics like
+// _addcarry_u64/_subborrow_u64 are not available. We provide a device-safe
+// fallback under __CUDA_ARCH__.
+// ------------------------------------------------------------------
+static inline unsigned char addcarry_u64_u64p(unsigned char c, uint64_t a, uint64_t b, uint64_t *out) {
+#if defined(__CUDA_ARCH__)
+  uint64_t s1 = a + b;
+  unsigned char c1 = (s1 < a) ? 1 : 0;
+  uint64_t s2 = s1 + (uint64_t)c;
+  unsigned char c2 = (s2 < s1) ? 1 : 0;
+  *out = s2;
+  return (unsigned char)(c1 | c2);
+#else
+  return _addcarry_u64(c, (unsigned __int64)a, (unsigned __int64)b, (unsigned __int64 *)out);
+#endif
+}
+
+static inline unsigned char subborrow_u64_u64p(unsigned char c, uint64_t a, uint64_t b, uint64_t *out) {
+#if defined(__CUDA_ARCH__)
+  uint64_t bc = b + (uint64_t)c;
+  unsigned char borrow = (bc < b) || (a < bc);
+  *out = a - bc;
+  return borrow;
+#else
+  return _subborrow_u64(c, (unsigned __int64)a, (unsigned __int64)b, (unsigned __int64 *)out);
+#endif
+}
+
 #endif
 
 

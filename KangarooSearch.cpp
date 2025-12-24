@@ -10,6 +10,12 @@
 #include <fstream>
 #include <iostream>
 
+#ifndef M_PI
+// MSVC does not guarantee M_PI in <cmath> unless _USE_MATH_DEFINES is set.
+// Define it explicitly for portability.
+#define M_PI 3.14159265358979323846264338327950288
+#endif
+
 KangarooSearch::KangarooSearch(Secp256K1 *secp) {
   this->secp = secp;
   jumpDistanceBits = 16;      // По умолчанию

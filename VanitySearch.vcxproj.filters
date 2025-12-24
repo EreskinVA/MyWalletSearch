@@ -43,6 +43,10 @@
     </ClInclude>
     <ClInclude Include="Bech32.h" />
     <ClInclude Include="Wildcard.h" />
+    <ClInclude Include="SegmentSearch.h" />
+    <ClInclude Include="ProgressManager.h" />
+    <ClInclude Include="LoadBalancer.h" />
+    <ClInclude Include="KangarooSearch.h" />
     <ClInclude Include="GPU\GPUBase58.h">
       <Filter>GPU</Filter>
     </ClInclude>
@@ -81,6 +85,10 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Bech32.cpp" />
     <ClCompile Include="Wildcard.cpp" />
+    <ClCompile Include="SegmentSearch.cpp" />
+    <ClCompile Include="ProgressManager.cpp" />
+    <ClCompile Include="LoadBalancer.cpp" />
+    <ClCompile Include="KangarooSearch.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="GPU\GPUEngine.cu">

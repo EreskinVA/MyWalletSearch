@@ -13,6 +13,128 @@
 
 ---
 
+## 0) Windows (локально): сборка и запуск (Visual Studio / MSBuild)
+
+Ниже — “правильные” команды для Windows 10/11 + NVIDIA.
+
+### 0.1 Быстрая проверка GPU и Compute Capability
+
+В PowerShell:
+
+```powershell
+nvidia-smi
+nvidia-smi -L
+nvidia-smi --query-gpu=name,compute_cap,driver_version --format=csv,noheader
+```
+
+Ожидаемо вы увидите что-то вроде:
+- `CUDA Version: 12.x` (это версия, поддерживаемая драйвером)
+- `compute_cap: 6.1 / 7.5 / 8.6 / 8.9 ...`
+
+### 0.2 Важное про CUDA версии и старые GPU (GTX 10xx / Pascal)
+
+- **CUDA 13.x не поддерживает Pascal (sm_61)** → сборка GPU под GTX 1050 Ti/1060/1070/1080 на CUDA 13.x будет падать.
+- Для GTX 10xx используйте **CUDA 11.8** (рекомендуется) и сборку под **`sm_61`**.
+
+### 0.3 Сборка в Visual Studio (рекомендуется)
+
+Откройте `VanitySearch.sln` и выберите конфигурацию:
+
+- **`ReleaseSM61 | x64`** — для **GTX 1050 Ti (sm_61)** (использует CUDA 11.8).
+- **`Release | x64`** — для современных GPU (например RTX 20/30/40) на более новых CUDA.
+
+Затем `Build -> Build Solution`.
+
+Выходной файл будет в:
+- `x64\ReleaseSM61\VanitySearch.exe` (для ReleaseSM61)
+- `x64\Release\VanitySearch.exe` (для Release)
+
+### 0.4 Сборка из консоли (MSBuild)
+
+В PowerShell:
+
+```powershell
+Set-Location "C:\path\to\MyWalletSearch"
+$msb = "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe"
+
+# GTX 1050 Ti / CUDA 11.8 / sm_61
+& $msb VanitySearch.sln /t:Rebuild /p:Configuration=ReleaseSM61 /p:Platform=x64 /m /v:m
+```
+
+### 0.5 Запуск exe + сохранение лога
+
+```powershell
+Set-Location "C:\path\to\MyWalletSearch\x64\ReleaseSM61"
+
+# список CUDA-устройств (встроенная проверка, что runtime ок)
+.\VanitySearch.exe -l
+
+# любой запуск с записью лога в файл:
+.\VanitySearch.exe -gpu -gpuId 0 -g 48,128 -t 2 "1*1"  *> run.log
+```
+
+> `*>` в PowerShell пишет и stdout, и stderr в один файл.
+
+### 0.6 Как выбрать grid (`-g`) на Windows
+
+Формула по подсказке `-h`: **дефолт = `8*(MP),128`**, где MP = число SM (multiprocessors).
+
+Узнать MP можно командой:
+
+```powershell
+.\VanitySearch.exe -l
+```
+
+Пример для GTX 1050 Ti (6 SM):
+- **`-g 48,128`**
+
+Рекомендация:
+- Начинайте с дефолта (`8*MP,128`), и при OOM уменьшайте X (`48` → `32` → `16`).
+
+### 0.7 Проверка корректности GPU/CPU (`-check`)
+
+Важно: **`-g` должен быть ДО `-check`**, иначе `-g` не применится.
+
+```powershell
+Set-Location "C:\path\to\MyWalletSearch\x64\ReleaseSM61"
+.\VanitySearch.exe -gpu -gpuId 0 -g 48,128 -m 4096 -check  *> check.log
+```
+
+Ожидаемо в конце:
+- `GPU/CPU check OK`
+
+### 0.8 Сегментный тест + префикс*суффикс (Windows пример)
+
+Скопируйте тестовый конфиг сегментов рядом с exe (если он лежит в корне репо):
+
+```powershell
+Copy-Item -Force "C:\path\to\MyWalletSearch\seg_matrix_test.txt" "C:\path\to\MyWalletSearch\x64\ReleaseSM61\seg_matrix_test.txt"
+```
+
+Запуск (быстрый тест на маленьком диапазоне, чтобы быстро увидеть Found):
+
+```powershell
+Set-Location "C:\path\to\MyWalletSearch\x64\ReleaseSM61"
+.\VanitySearch.exe `
+  -seg .\seg_matrix_test.txt -bits 24 `
+  -gpu -gpuId 0 -g 48,128 -t 2 -m 200000 `
+  -stop -o out_seg_prefix_suffix.txt `
+  "1*1"  *> seg_test.log
+```
+
+- Результаты (адреса/ключи) будут в `out_seg_prefix_suffix.txt`
+- Лог — в `seg_test.log`
+
+### 0.9 Остановка зависшего процесса (Windows)
+
+Если нужно быстро остановить:
+
+```powershell
+Get-Process VanitySearch -ErrorAction SilentlyContinue | Stop-Process -Force
+```
+
+---
+
 ## 1) Быстрая диагностика “всё ли живо”
 
 ### CPU процессы
