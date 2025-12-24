@@ -1967,7 +1967,13 @@ void VanitySearch::FindKeyGPU(TH_PARAM *ph) {
     for(int i=0;i<(int)found.size() && !endOfSearch;i++) {
 
       ITEM it = found[i];
-      checkAddr(*(prefix_t *)(it.hash), it.hash, keys[it.thId], it.incr, it.endo, it.mode);
+      // ВАЖНО: GPU использует startKey = keys[i] + groupSize/2
+      // incr от GPU - это смещение от startKey
+      // Поэтому нужно передать keys[i] + groupSize/2 как базовый ключ
+      Int gpuStartKey;
+      gpuStartKey.Set(&keys[it.thId]);
+      gpuStartKey.Add((uint64_t)(g.GetGroupSize() / 2));
+      checkAddr(*(prefix_t *)(it.hash), it.hash, gpuStartKey, it.incr, it.endo, it.mode);
 
     }
 
