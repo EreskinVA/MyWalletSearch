@@ -484,14 +484,15 @@ void sha256_65(unsigned char *input, unsigned char *digest) {
 }
 
 void sha256_checksum(const uint8_t *input, int length, uint8_t *checksum) {
-
-  uint32_t s[8];
-  uint8_t b[64];
-  memcpy(b,input,length);
-  memcpy(b + length, _sha256::pad, 56-length);
-  WRITEBE64(b + 56, length << 3);
-  _sha256::Transform2(s, b);
-  WRITEBE32(checksum,s[0]);
+  // Base58Check/WIF checksum is defined as first 4 bytes of SHA256(SHA256(data)).
+  // The previous "fast path" based on Transform2() has proven fragile and produced
+  // incorrect checksums in the field. Correctness here is far more important than
+  // micro-optimisations.
+  uint8_t d1[32];
+  uint8_t d2[32];
+  sha256(input, length, d1);
+  sha256(d1, 32, d2);
+  memcpy(checksum, d2, 4);
 
 }
 
