@@ -116,9 +116,18 @@ VanitySearch::VanitySearch(Secp256K1 *secp, vector<std::string> &inputPrefixes,s
     prefixes.push_back(t);
 
   // Check is inputPrefixes contains wildcard character
-  for (int i = 0; i < (int)inputPrefixes.size() && !hasPattern; i++) {
-    hasPattern = ((inputPrefixes[i].find('*') != std::string::npos) ||
-                   (inputPrefixes[i].find('?') != std::string::npos) );
+  // ВАЖНО: Для простых префиксов добавляем '*' в конец, чтобы они обрабатывались как паттерны
+  // Это необходимо для корректной работы с GPU, так как GPU не использует таблицу префиксов
+  for (int i = 0; i < (int)inputPrefixes.size(); i++) {
+    bool hasWildcard = ((inputPrefixes[i].find('*') != std::string::npos) ||
+                        (inputPrefixes[i].find('?') != std::string::npos));
+    if (!hasWildcard) {
+      // Добавляем '*' в конец для обработки как паттерна
+      inputPrefixes[i] += "*";
+      hasPattern = true;
+    } else {
+      hasPattern = true;
+    }
   }
   
   // Парсим позиционные маски для всех паттернов
