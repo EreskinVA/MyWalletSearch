@@ -1130,11 +1130,11 @@ bool VanitySearch::checkPositionalMask(const std::string &addr, const POSITIONAL
 
 void VanitySearch::checkAddr(int prefIdx, uint8_t *hash160, Int &key, int32_t incr, int endomorphism, bool mode) {
 
-  // Временное логирование первых нескольких проверок для отладки
+  // Отладочное логирование первых найденных адресов
   static int debugCount = 0;
-  if (debugCount < 5) {
+  if (debugCount < 10) {
     string addr = secp->GetAddress(searchType, mode, hash160);
-    printf("\n[DEBUG checkAddr #%d] Checking address: %s (key: %s, incr: %d, endo: %d, mode: %d)\n", 
+    printf("\n[DEBUG checkAddr #%d] Checking address: %s (base key: %s, incr: %d, endo: %d, mode: %d)\n", 
            debugCount, addr.c_str(), key.GetBase16().c_str(), incr, endomorphism, mode);
     debugCount++;
   }
@@ -1887,6 +1887,10 @@ void VanitySearch::getGPUStartingKeys(int thId, int groupSize, int nbThread, Int
     p[i] = secp->ComputePublicKey(&k);
     if (startPubKeySpecified)
       p[i] = secp->AddDirect(p[i], startPubKey);
+    
+    // ВАЖНО: Обновляем keys[i], чтобы он соответствовал реальному ключу, 
+    // используемому GPU kernel (с добавлением groupSize/2)
+    keys[i].Add((uint64_t)(groupSize / 2));
   }
 
 }
