@@ -1963,6 +1963,17 @@ void VanitySearch::Search(int nbThread,std::vector<int> gpuId,std::vector<int> g
         int activeSegs = segmentSearch->GetActiveSegmentCount();
         if (activeSegs > 0) {
           printf("[Segments: %d active]", activeSegs);
+          
+          // Периодическое логирование прогресса (каждые 30 секунд)
+          static time_t lastProgressLog = 0;
+          time_t now = time(NULL);
+          if (now - lastProgressLog >= 30) {
+            // Получаем общий прогресс из SegmentSearch
+            double overallProgress = segmentSearch->GetOverallProgress();
+            printf("\n[ProgressManager] Общий прогресс: %.2f%% | Активных сегментов: %d",
+                   overallProgress, activeSegs);
+            lastProgressLog = now;
+          }
         }
       }
     }

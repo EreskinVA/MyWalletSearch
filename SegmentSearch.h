@@ -76,6 +76,7 @@ public:
   bool SaveProgress(const std::string &targetAddress);
   bool LoadProgress(const std::string &targetAddress);
   void UpdateProgress(int threadId, uint64_t keysChecked);
+  void UpdateKangarooProgress(int segmentIndex, uint64_t totalJumps);
   bool ShouldAutoSave();
   
   // Балансировка нагрузки

@@ -412,6 +412,54 @@ void SegmentSearch::UpdateProgress(int threadId, uint64_t keysChecked) {
                                             segments[segIdx].currentKey, keysChecked);
     keysCheckedSinceLastSave += keysChecked;
     
+    // Периодический вывод прогресса (каждые 1M ключей)
+    static uint64_t lastLogProgress = 0;
+    if (currentProgress.totalKeysChecked - lastLogProgress >= 1000000) {
+      printf("[ProgressManager] Всего ключей проверено: %llu (сегмент %d: %llu)\n",
+             (unsigned long long)currentProgress.totalKeysChecked,
+             segIdx,
+             (unsigned long long)currentProgress.segments[segIdx].keysChecked);
+      lastLogProgress = currentProgress.totalKeysChecked;
+    }
+    
+    // Автосохранение
+    if (ShouldAutoSave()) {
+      SaveProgress(currentProgress.targetAddress);
+    }
+  }
+}
+
+void SegmentSearch::UpdateKangarooProgress(int segmentIndex, uint64_t totalJumps) {
+  if (!progressSavingEnabled) return;
+  if (segmentIndex < 0 || segmentIndex >= (int)segments.size()) return;
+  
+  // Для Kangaroo используем jumps как эквивалент ключей
+  // 1 jump ≈ проверка одного ключа в контексте прогресса
+  uint64_t keysEquivalent = totalJumps;
+  
+  // Получаем текущее значение из прогресса
+  uint64_t oldKeys = 0;
+  if (segmentIndex < (int)currentProgress.segments.size()) {
+    oldKeys = currentProgress.segments[segmentIndex].keysChecked;
+  }
+  
+  // Обновляем только если есть прирост
+  if (keysEquivalent > oldKeys) {
+    uint64_t increment = keysEquivalent - oldKeys;
+    ProgressManager::UpdateSegmentProgress(currentProgress, segmentIndex,
+                                            segments[segmentIndex].currentKey, increment);
+    keysCheckedSinceLastSave += increment;
+    
+    // Периодический вывод прогресса (каждые 1M jumps)
+    static uint64_t lastLogJumps = 0;
+    if (totalJumps - lastLogJumps >= 1000000) {
+      printf("[ProgressManager] Kangaroo: %llu jumps (сегмент %d: %s)\n",
+             (unsigned long long)totalJumps,
+             segmentIndex,
+             segments[segmentIndex].name.c_str());
+      lastLogJumps = totalJumps;
+    }
+    
     // Автосохранение
     if (ShouldAutoSave()) {
       SaveProgress(currentProgress.targetAddress);
@@ -543,8 +591,22 @@ bool SegmentSearch::SearchSegmentWithKangaroo(int segmentIndex, Secp256K1 *secp,
   // Настроить параметры
   kangarooSearch->SetNumKangaroos(4, 4);  // 4 tame, 4 wild
   
+  // Периодическое обновление прогресса
+  time_t lastProgressUpdate = time(NULL);
+  uint64_t lastJumps = 0;
+  
+  // Запустить поиск с периодическим обновлением прогресса
+  // Модифицируем Search чтобы он периодически обновлял прогресс
+  // Для этого нужно добавить callback или периодически проверять totalJumps
+  
   // Запустить поиск
   bool found = kangarooSearch->Search(foundKey, 0);  // 0 = без лимита
+  
+  // Обновить прогресс после завершения
+  if (kangarooSearch != NULL) {
+    uint64_t totalJumps = kangarooSearch->GetTotalJumps();
+    UpdateKangarooProgress(segmentIndex, totalJumps);
+  }
   
   return found;
 }

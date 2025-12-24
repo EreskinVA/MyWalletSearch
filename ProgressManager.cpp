@@ -223,10 +223,27 @@ bool ProgressManager::SaveProgress(const SearchProgress &progress) {
            (unsigned long long)progress.totalKeysChecked);
     printf("[ProgressManager]   Активных сегментов: ");
     int activeCount = 0;
+    uint64_t totalSegmentKeys = 0;
     for (size_t i = 0; i < progress.segments.size(); i++) {
       if (progress.segments[i].active) activeCount++;
+      totalSegmentKeys += progress.segments[i].keysChecked;
     }
     printf("%d/%d\n", activeCount, (int)progress.segments.size());
+    
+    // Дополнительная информация о сегментах (если их не слишком много)
+    if (progress.segments.size() > 0 && progress.segments.size() <= 20) {
+      printf("[ProgressManager]   Прогресс по сегментам:\n");
+      for (size_t i = 0; i < progress.segments.size(); i++) {
+        const SegmentProgress &seg = progress.segments[i];
+        if (seg.active || seg.keysChecked > 0) {
+          printf("[ProgressManager]     %s: %llu ключей [%s]\n",
+                 seg.name.c_str(),
+                 (unsigned long long)seg.keysChecked,
+                 seg.active ? "активен" : "завершен");
+        }
+      }
+    }
+    
     return true;
   }
   
