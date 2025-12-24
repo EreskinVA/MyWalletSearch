@@ -937,19 +937,29 @@ void VanitySearch::updateFound() {
 
 bool VanitySearch::checkPrivKey(string addr, Int &key, int32_t incr, int endomorphism, bool mode) {
 
-  Int k(&key);
+  // Always work modulo curve order: in the group, (k mod n)*G == k*G.
+  // Using a reduced base key avoids subtle issues when the input scalar is >= n.
+  Int baseKey(&key);
+  baseKey.Mod(&secp->order);
+  Int k(&baseKey);
   Int originalKey(&key);
   Point sp = startPubKey;
 
   if (incr < 0) {
-    // GPU reports symmetric points by negating Y and sending negative incr.
-    // The corresponding scalar is: k = -(key + |incr|) mod n  == n - (key + |incr|)
-    k.Add((uint64_t)(-incr));
-    k.Neg();
-    k.Add(&secp->order);
+    // GPU reports symmetric points by negating Y and sending a negative incr.
+    // The corresponding scalar is: k = -(key + |incr|) mod n.
+    //
+    // Important: do NOT use raw Neg()+Add(order) here because Int::Neg() is a 2's-complement negate,
+    // not a modular negate, and would yield a wrong scalar (>n) which breaks ComputePublicKey().
+    Int a((uint64_t)(-(int64_t)incr));
+    Int t(&baseKey);
+    t.ModAddK1order(&a);   // t = (key + |incr|) mod n
+    k.SetInt32(0);
+    k.ModSubK1order(&t);   // k = -t mod n
     if (startPubKeySpecified) sp.y.ModNeg();
   } else {
-    k.Add((uint64_t)incr);
+    Int a((uint64_t)incr);
+    k.ModAddK1order(&a);   // k = (key + incr) mod n
   }
 
   // Endomorphisms
@@ -972,8 +982,10 @@ bool VanitySearch::checkPrivKey(string addr, Int &key, int32_t incr, int endomor
   if (chkAddr != addr) {
 
     //Key may be the opposite one (negative zero or compressed key)
-    k.Neg();
-    k.Add(&secp->order);
+    Int opp;
+    opp.SetInt32(0);
+    opp.ModSubK1order(&k); // opp = -k mod n
+    k.Set(&opp);
     p = secp->ComputePublicKey(&k);
     if (startPubKeySpecified) {
       sp.y.ModNeg();
@@ -990,13 +1002,17 @@ bool VanitySearch::checkPrivKey(string addr, Int &key, int32_t incr, int endomor
       printf("  Compressed: %d\n", mode);
       
       // Вычисляем ключ без endomorphism для проверки
-      Int testKey(&originalKey);
+      Int testKey(&baseKey);
       if (incr < 0) {
-        testKey.Add((uint64_t)(-incr));
-        testKey.Neg();
-        testKey.Add(&secp->order);
+        Int a((uint64_t)(-(int64_t)incr));
+        testKey.ModAddK1order(&a);
+        Int tmp;
+        tmp.SetInt32(0);
+        tmp.ModSubK1order(&testKey);
+        testKey.Set(&tmp);
       } else {
-        testKey.Add((uint64_t)incr);
+        Int a((uint64_t)incr);
+        testKey.ModAddK1order(&a);
       }
       printf("  Key after incr (no endo): %s\n", testKey.GetBase16().c_str());
       printf("  Final key (with endo): %s\n", k.GetBase16().c_str());
