@@ -227,6 +227,9 @@ VanitySearch::VanitySearch(Secp256K1 *secp, vector<std::string> &inputPrefixes,s
             bool *found = new bool;
             *found = false;
             it.found = found;
+            // IMPORTANT: initPrefix() sets it.prefix to prefix.c_str(). Here `prefixStr` is a local
+            // std::string (temporary copy), so we must duplicate it or we'll keep a dangling pointer.
+            it.prefix = strdup(it.prefix);
             it.suffix = NULL;
             it.suffixLength = 0;
             itPrefixes.push_back(it);
@@ -236,6 +239,8 @@ VanitySearch::VanitySearch(Secp256K1 *secp, vector<std::string> &inputPrefixes,s
             bool *found = new bool;
             *found = false;
             it.found = found;
+            // IMPORTANT: duplicate strings because prefixStr/suffixStr are local temporaries.
+            it.prefix = strdup(it.prefix);
             it.suffix = strdup(it.suffix);
             itPrefixes.push_back(it);
           }
