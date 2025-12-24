@@ -217,7 +217,9 @@ void SegmentSearch::InitializeSegments(int bits) {
     if (segments[i].direction == DIRECTION_UP) {
       segments[i].currentKey.Set(&segments[i].rangeStart);
     } else {
-      segments[i].currentKey.Set(&segments[i].rangeEnd);
+      // Для DOWN ожидаемый формат в конфиге: startPercent > endPercent (пример: 10 -> 5 down)
+      // Значит начинать нужно с верхней границы (rangeStart) и двигаться к нижней (rangeEnd).
+      segments[i].currentKey.Set(&segments[i].rangeStart);
     }
     
     segNames.push_back(segments[i].name);
@@ -455,7 +457,8 @@ bool SegmentSearch::GetNextKey(int threadId, Int &key) {
       return false;
     }
   } else {
-    if (seg.currentKey.IsLower(&seg.rangeStart)) {
+    // Для DOWN идём вниз от rangeStart к rangeEnd, значит завершение когда currentKey < rangeEnd
+    if (seg.currentKey.IsLower(&seg.rangeEnd)) {
       seg.active = false;
       activeSegments--;
       std::string segName = seg.name;
@@ -795,7 +798,7 @@ void SegmentSearch::UpdateProgress(int threadId, uint64_t keysChecked) {
         }
       } else {
         segments[segIdx].currentKey.Sub(scalarStep);
-        if (segments[segIdx].currentKey.IsLower(&segments[segIdx].rangeStart)) {
+        if (segments[segIdx].currentKey.IsLower(&segments[segIdx].rangeEnd)) {
           segments[segIdx].active = false;
           activeSegments--;
           printf("[SegmentSearch] Сегмент %s завершен (поиск вниз)\n", segments[segIdx].name.c_str());
