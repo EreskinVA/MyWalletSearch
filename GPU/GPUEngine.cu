@@ -226,6 +226,25 @@ GPUEngine::GPUEngine(int nbThreadGroup, int nbThreadPerGroup, int gpuId, uint32_
   this->rekey = rekey;
   this->nbThreadPerGroup = nbThreadPerGroup;
   initialised = false;
+  // Fail-safe defaults (so early returns never leave dangling pointers / sizes)
+  nbThread = 0;
+  this->maxFound = maxFound;
+  outputSize = 0;
+  inputPrefix = NULL;
+  inputPrefixPinned = NULL;
+  inputPrefixPinnedCuda = false;
+  inputPrefixLookUp = NULL;
+  inputPrefixLookUpPinned = NULL;
+  inputPrefixLookUpPinnedCuda = false;
+  inputKey = NULL;
+  inputKeyPinned = NULL;
+  inputKeyPinnedCuda = false;
+  outputPrefix = NULL;
+  outputPrefixPinned = NULL;
+  outputPrefixPinnedCuda = false;
+  lostWarning = false;
+  pattern = "";
+  hasPattern = false;
   cudaError_t err;
 
   int deviceCount = 0;
@@ -285,22 +304,43 @@ GPUEngine::GPUEngine(int nbThreadGroup, int nbThreadPerGroup, int gpuId, uint32_
   size_t stackCandidates[] = {20480, 16384};
   bool stackOk = false;
   size_t selectedStack = 0;
-  for (size_t k = 0; k < sizeof(stackCandidates) / sizeof(stackCandidates[0]); k++) {
-    size_t stackSize = stackCandidates[k];
-    err = cudaDeviceSetLimit(cudaLimitStackSize, stackSize);
-    if (err == cudaSuccess) {
-      stackOk = true;
-      selectedStack = stackSize;
-      // Clear any stale "last error" state in case previous runtime calls failed.
+  int curGroups = nbThreadGroup;
+  while (curGroups >= 1 && !stackOk) {
+    for (size_t k = 0; k < sizeof(stackCandidates) / sizeof(stackCandidates[0]); k++) {
+      size_t stackSize = stackCandidates[k];
+      err = cudaDeviceSetLimit(cudaLimitStackSize, stackSize);
+      if (err == cudaSuccess) {
+        stackOk = true;
+        selectedStack = stackSize;
+        (void)cudaGetLastError();
+        break;
+      }
+      printf("GPUEngine: cudaDeviceSetLimit(stack=%zu) failed: %s\n", stackSize, cudaGetErrorString(err));
       (void)cudaGetLastError();
-      break;
     }
-    printf("GPUEngine: cudaDeviceSetLimit(stack=%zu) failed: %s\n", stackSize, cudaGetErrorString(err));
-    (void)cudaGetLastError();
+    if (!stackOk) {
+      if (curGroups == 1) break;
+      int newGroups = curGroups / 2;
+      if (newGroups < 1) newGroups = 1;
+      printf("GPUEngine: Hint: reduce grid size (-g). Auto-reducing Grid(%dx%d) -> Grid(%dx%d) and retrying...\n",
+             curGroups, nbThreadPerGroup, newGroups, nbThreadPerGroup);
+      curGroups = newGroups;
+      this->nbThread = curGroups * nbThreadPerGroup;
+      // Update deviceName to reflect new grid (helps debugging)
+      char tmp2[512];
+      sprintf(tmp2,"GPU #%d %s (%dx%d cores) Grid(%dx%d)",
+              gpuId,deviceProp.name,deviceProp.multiProcessorCount,
+              _ConvertSMVer2Cores(deviceProp.major, deviceProp.minor),
+              nbThread / nbThreadPerGroup,
+              nbThreadPerGroup);
+      deviceName = std::string(tmp2);
+    }
   }
   if (!stackOk || selectedStack < minRequiredStack) {
     printf("GPUEngine: ERROR: unable to set cudaLimitStackSize to %zu bytes.\n", minRequiredStack);
     printf("GPUEngine: Hint: reduce grid size (-g) to reduce total stack allocation.\n");
+    printf("GPUEngine: ERROR: GPU engine not initialised; GPU thread will exit.\n");
+    nbThread = 0;
     return;
   }
   printf("GPUEngine: cudaLimitStackSize set to %zu bytes\n", selectedStack);
@@ -439,6 +479,7 @@ void GPUEngine::SetSearchType(int searchType) {
 
 void GPUEngine::SetPrefix(std::vector<prefix_t> prefixes) {
 
+  if (!initialised || !inputPrefixPinned || !inputPrefix) return;
   memset(inputPrefixPinned, 0, _64K * 2);
   for(int i=0;i<(int)prefixes.size();i++)
     inputPrefixPinned[prefixes[i]]=1;
@@ -462,6 +503,7 @@ void GPUEngine::SetPrefix(std::vector<prefix_t> prefixes) {
 
 void GPUEngine::SetPattern(const char *pattern) {
 
+  if (!initialised || !inputPrefixPinned || !inputPrefix) return;
   strcpy((char *)inputPrefixPinned,pattern);
 
   // Fill device memory
@@ -484,6 +526,7 @@ void GPUEngine::SetPattern(const char *pattern) {
 
 void GPUEngine::SetPrefix(std::vector<LPREFIX> prefixes, uint32_t totalPrefix) {
 
+  if (!initialised || !inputPrefixPinned || !inputPrefix) return;
   // Allocate memory for the second level of lookup tables
   cudaError_t err = cudaMalloc((void **)&inputPrefixLookUp, (_64K+totalPrefix) * 4);
   if (err != cudaSuccess) {
@@ -586,6 +629,10 @@ bool GPUEngine::callKernel() {
 
 bool GPUEngine::SetKeys(Point *p) {
 
+  if (!initialised || !inputKeyPinned || !inputKey) {
+    printf("GPUEngine: SetKeys: engine not initialised (or missing buffers)\n");
+    return false;
+  }
   // Sets the starting keys for each thread
   // p must contains nbThread public keys
   for (int i = 0; i < nbThread; i+= nbThreadPerGroup) {
@@ -625,6 +672,10 @@ bool GPUEngine::SetKeys(Point *p) {
 
 bool GPUEngine::Launch(std::vector<ITEM> &prefixFound,bool spinWait) {
 
+  if (!initialised || !outputPrefix || !outputPrefixPinned) {
+    printf("GPUEngine: Launch: engine not initialised (or missing buffers)\n");
+    return false;
+  }
 
   prefixFound.clear();
 

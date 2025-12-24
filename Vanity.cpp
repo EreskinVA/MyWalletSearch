@@ -1927,6 +1927,11 @@ void VanitySearch::FindKeyGPU(TH_PARAM *ph) {
   // Global init
   int thId = ph->threadId;
   GPUEngine g(ph->gridSizeX,ph->gridSizeY, ph->gpuId, maxFound, (rekey!=0));
+  if (!g.IsInitialised()) {
+    printf("GPUEngine: initialisation failed; GPU thread %d exiting (try smaller -g)\n", thId);
+    ph->isRunning = false;
+    return;
+  }
   int nbThread = g.GetNbThread();
   Point *p = new Point[nbThread];
   Int *keys = new Int[nbThread];

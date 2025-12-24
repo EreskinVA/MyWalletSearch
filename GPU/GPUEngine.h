@@ -58,6 +58,7 @@ public:
 
   GPUEngine(int nbThreadGroup,int nbThreadPerGroup,int gpuId,uint32_t maxFound,bool rekey);
   ~GPUEngine();
+  bool IsInitialised() const { return initialised; }
   void SetPrefix(std::vector<prefix_t> prefixes);
   void SetPrefix(std::vector<LPREFIX> prefixes,uint32_t totalPrefix);
   bool SetKeys(Point *p);
