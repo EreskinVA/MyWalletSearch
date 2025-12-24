@@ -1114,11 +1114,21 @@ POSITIONAL_MASK VanitySearch::parsePositionalMask(const std::string &pattern) {
   mask.isValid = false;
   mask.totalLength = (int)pattern.length();
   mask.fixedPositions.clear();
+
+  // Позиционная маска в этом проекте — это "полноразмерный" паттерн адреса,
+  // где '*' используется как placeholder по позициям (а не как "любой длины").
+  // Поэтому короткие паттерны вроде "1P*nt7pX" нельзя трактовать как позиционную маску:
+  // иначе ранний фильтр по длине будет всегда отбрасывать совпадения.
+  // Для Base58 адресов разумный диапазон длины: 26..35.
+  if (mask.totalLength < 26 || mask.totalLength > 35) {
+    return mask;
+  }
   
   // Проверяем, является ли паттерн позиционной маской
   // Позиционная маска должна содержать только символы Base58 и звездочки
   bool hasStars = false;
   bool hasFixedChars = false;
+  bool hasQuestion = false;
   
   for (size_t i = 0; i < pattern.length(); i++) {
     char c = pattern[i];
@@ -1134,9 +1144,13 @@ POSITIONAL_MASK VanitySearch::parsePositionalMask(const std::string &pattern) {
       item.position = (int)i;
       item.character = caseSensitive ? c : tolower(c);
       mask.fixedPositions.push_back(item);
-    } else if (c == '?' || c == '0' || c == 'O' || c == 'I' || c == 'l') {
-      // '?' - wildcard, '0', 'O', 'I', 'l' - не используются в Base58, но могут быть в паттерне
-      // Игнорируем для позиционной маски
+    } else if (c == '?') {
+      // '?' — wildcard по одному символу. Для позиционных масок в этом проекте используем только '*'.
+      // Иначе ранняя проверка может некорректно "отрезать" совпадения.
+      hasQuestion = true;
+    } else if (c == '0' || c == 'O' || c == 'I' || c == 'l') {
+      // Эти символы не используются в Base58 адресах.
+      return mask;
     } else {
       // Неизвестный символ - не валидная позиционная маска
       return mask;
@@ -1144,7 +1158,7 @@ POSITIONAL_MASK VanitySearch::parsePositionalMask(const std::string &pattern) {
   }
   
   // Позиционная маска должна содержать и звездочки, и фиксированные символы
-  mask.isValid = (hasStars && hasFixedChars && mask.fixedPositions.size() > 0);
+  mask.isValid = (!hasQuestion && hasStars && hasFixedChars && mask.fixedPositions.size() > 0);
   
   return mask;
 }
@@ -1991,13 +2005,14 @@ void VanitySearch::FindKeyGPU(TH_PARAM *ph) {
 
   g.SetSearchMode(searchMode);
   g.SetSearchType(searchType);
-  if (onlyFull) {
-    g.SetPrefix(usedPrefixL,nbPrefix);
+  // IMPORTANT: if hasPattern==true we MUST use pattern matching on GPU regardless of `onlyFull`.
+  // Calling SetPrefix() here breaks wildcard searches (and triggers "Wrong totalPrefix").
+  if (hasPattern) {
+    g.SetPattern(inputPrefixes[0].c_str());
+  } else if (onlyFull) {
+    g.SetPrefix(usedPrefixL, nbPrefix);
   } else {
-    if(hasPattern)
-      g.SetPattern(inputPrefixes[0].c_str());
-    else
-      g.SetPrefix(usedPrefix);
+    g.SetPrefix(usedPrefix);
   }
 
   getGPUStartingKeys(thId, g.GetGroupSize(), nbThread, keys, p);
