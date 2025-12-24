@@ -943,9 +943,18 @@ bool VanitySearch::checkPrivKey(string addr, Int &key, int32_t incr, int endomor
   Point sp = startPubKey;
 
   if (incr < 0) {
-    k.Add((uint64_t)(-incr));
-    k.Neg();
-    k.Add(&secp->order);
+    // Для отрицательного incr: k = key - |incr|
+    // Если результат отрицательный, добавляем order
+    Int absIncr((uint64_t)(-incr));
+    if (k.IsGreater(&absIncr)) {
+      k.Sub(&absIncr);
+    } else {
+      // k < absIncr, поэтому k - absIncr будет отрицательным
+      // Вычисляем: order - (absIncr - k)
+      absIncr.Sub(&k);
+      k.Set(&secp->order);
+      k.Sub(&absIncr);
+    }
     if (startPubKeySpecified) sp.y.ModNeg();
   } else {
     k.Add((uint64_t)incr);
