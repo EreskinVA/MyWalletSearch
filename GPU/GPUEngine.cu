@@ -426,16 +426,6 @@ void GPUEngine::PrintCudaInfo() {
 
   cudaError_t err;
 
-  const char *sComputeMode[] =
-  {
-    "Multiple host threads",
-    "Only one host thread",
-    "No host thread",
-    "Multiple process threads",
-    "Unknown",
-     NULL
-  };
-
   int deviceCount = 0;
   cudaError_t error_id = cudaGetDeviceCount(&deviceCount);
 
