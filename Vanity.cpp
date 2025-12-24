@@ -38,6 +38,16 @@ Point Gn[CPU_GRP_SIZE / 2];
 Point _2Gn;
 
 // ----------------------------------------------------------------------------
+// Debug logging (disabled by default)
+// Enable by compiling with: -DVANITYSEARCH_DEBUG_LOGS
+// ----------------------------------------------------------------------------
+#ifdef VANITYSEARCH_DEBUG_LOGS
+#define VS_DEBUGF(...) printf(__VA_ARGS__)
+#else
+#define VS_DEBUGF(...) do {} while (0)
+#endif
+
+// ----------------------------------------------------------------------------
 
 VanitySearch::VanitySearch(Secp256K1 *secp, vector<std::string> &inputPrefixes,string seed,int searchMode,
                            bool useGpu, bool stop, string outputFile, bool useSSE, uint32_t maxFound,
@@ -1178,12 +1188,12 @@ bool VanitySearch::checkPositionalMask(const std::string &addr, const POSITIONAL
 
 void VanitySearch::checkAddr(int prefIdx, uint8_t *hash160, Int &key, int32_t incr, int endomorphism, bool mode) {
 
-  // Отладочное логирование первых найденных адресов
+  // Optional debug logging of first checked addresses
   static int debugCount = 0;
   if (debugCount < 10) {
     string addr = secp->GetAddress(searchType, mode, hash160);
-    printf("\n[DEBUG checkAddr #%d] Checking address: %s (base key: %s, incr: %d, endo: %d, mode: %d)\n", 
-           debugCount, addr.c_str(), key.GetBase16().c_str(), incr, endomorphism, mode);
+    VS_DEBUGF("\n[DEBUG checkAddr #%d] Checking address: %s (base key: %s, incr: %d, endo: %d, mode: %d)\n",
+              debugCount, addr.c_str(), key.GetBase16().c_str(), incr, endomorphism, mode);
     debugCount++;
   }
 
@@ -1967,14 +1977,14 @@ void VanitySearch::FindKeyGPU(TH_PARAM *ph) {
   // Отладочное логирование: выводим первые ключи из сегментов
   static bool debugKeysLogged = false;
   if (!debugKeysLogged && useSegmentSearch && segmentSearch != NULL) {
-    printf("[DEBUG GPU] First keys from segments (thread %d):\n", thId);
+    VS_DEBUGF("[DEBUG GPU] First keys from segments (thread %d):\n", thId);
     for (int i = 0; i < nbThread && i < 3; i++) {
       Int testKey;
       testKey.Set(keys + i);
-      printf("[DEBUG GPU]   Key[%d]: %s\n", i, testKey.GetBase16().c_str());
+      VS_DEBUGF("[DEBUG GPU]   Key[%d]: %s\n", i, testKey.GetBase16().c_str());
       Point testP = secp->ComputePublicKey(&testKey);
       string testAddr = secp->GetAddress(searchType, true, testP);
-      printf("[DEBUG GPU]   Address[%d]: %s\n", i, testAddr.c_str());
+      VS_DEBUGF("[DEBUG GPU]   Address[%d]: %s\n", i, testAddr.c_str());
     }
     debugKeysLogged = true;
   }
