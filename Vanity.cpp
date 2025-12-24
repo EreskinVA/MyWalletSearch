@@ -939,6 +939,7 @@ void VanitySearch::updateFound() {
 bool VanitySearch::checkPrivKey(string addr, Int &key, int32_t incr, int endomorphism, bool mode) {
 
   Int k(&key);
+  Int originalKey(&key);
   Point sp = startPubKey;
 
   if (incr < 0) {
@@ -979,10 +980,31 @@ bool VanitySearch::checkPrivKey(string addr, Int &key, int32_t incr, int endomor
     }
     string chkAddr = secp->GetAddress(searchType, mode, p);
     if (chkAddr != addr) {
-      printf("\nWarning, wrong private key generated !\n");
-      printf("  Addr :%s\n", addr.c_str());
-      printf("  Check:%s\n", chkAddr.c_str());
-      printf("  Endo:%d incr:%d comp:%d\n", endomorphism, incr, mode);
+      printf("\n[ERROR] Wrong private key generated!\n");
+      printf("  Target address: %s\n", addr.c_str());
+      printf("  Computed address: %s\n", chkAddr.c_str());
+      printf("  Base key (input): %s\n", originalKey.GetBase16().c_str());
+      printf("  Incr: %d (0x%x)\n", incr, (uint32_t)(uint16_t)incr);
+      printf("  Endomorphism: %d\n", endomorphism);
+      printf("  Compressed: %d\n", mode);
+      
+      // Вычисляем ключ без endomorphism для проверки
+      Int testKey(&originalKey);
+      if (incr < 0) {
+        testKey.Add((uint64_t)(-incr));
+        testKey.Neg();
+        testKey.Add(&secp->order);
+      } else {
+        testKey.Add((uint64_t)incr);
+      }
+      printf("  Key after incr (no endo): %s\n", testKey.GetBase16().c_str());
+      printf("  Final key (with endo): %s\n", k.GetBase16().c_str());
+      
+      // Проверяем адрес от ключа без endomorphism
+      Point testP = secp->ComputePublicKey(&testKey);
+      string testAddr = secp->GetAddress(searchType, mode, testP);
+      printf("  Address from key (no endo): %s\n", testAddr.c_str());
+      
       return false;
     }
 
