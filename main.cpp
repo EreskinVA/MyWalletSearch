@@ -41,6 +41,7 @@ void printUsage() {
   printf("             [-rp privkey partialkeyfile] [-seg segmentfile] [-bits bitrange]\n");
   printf("             [prefix]\n\n");
   printf(" prefix: prefix to search (Can contains wildcard '?' or '*')\n");
+  printf("         Format: \"prefix\" or \"prefix*suffix\" (e.g., \"1ABC*XYZ\")\n");
   printf(" -v: Print version\n");
   printf(" -u: Search uncompressed addresses\n");
   printf(" -b: Search both uncompressed or compressed addresses\n");

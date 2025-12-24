@@ -135,21 +135,46 @@ VanitySearch::VanitySearch(Secp256K1 *secp, vector<std::string> &inputPrefixes,s
       PREFIX_ITEM it;
       std::vector<PREFIX_ITEM> itPrefixes;
 
+      // Parse prefix and suffix (format: "prefix*suffix" or just "prefix")
+      string fullPattern = inputPrefixes[i];
+      string prefixStr = fullPattern;
+      string suffixStr = "";
+      size_t starPos = fullPattern.find('*');
+      if (starPos != string::npos && starPos < fullPattern.length() - 1) {
+        suffixStr = fullPattern.substr(starPos + 1);
+        prefixStr = fullPattern.substr(0, starPos);
+      }
+
+      // Initialize suffix fields to NULL by default
+      it.suffix = NULL;
+      it.suffixLength = 0;
+
       if (!caseSensitive) {
 
         // For caseunsensitive search, loop through all possible combination
         // and fill up lookup table
         vector<string> subList;
-        enumCaseUnsentivePrefix(inputPrefixes[i], subList);
+        enumCaseUnsentivePrefix(prefixStr, subList);
 
         bool *found = new bool;
         *found = false;
 
         for (int j = 0; j < (int)subList.size(); j++) {
-          if (initPrefix(subList[j], &it)) {
-            it.found = found;
-            it.prefix = strdup(it.prefix); // We need to allocate here, subList will be destroyed
-            itPrefixes.push_back(it);
+          if (suffixStr.empty()) {
+            if (initPrefix(subList[j], &it)) {
+              it.found = found;
+              it.prefix = strdup(it.prefix); // We need to allocate here, subList will be destroyed
+              it.suffix = NULL;
+              it.suffixLength = 0;
+              itPrefixes.push_back(it);
+            }
+          } else {
+            if (initPrefixSuffix(subList[j], suffixStr, &it)) {
+              it.found = found;
+              it.prefix = strdup(it.prefix);
+              it.suffix = strdup(it.suffix);
+              itPrefixes.push_back(it);
+            }
           }
         }
 
@@ -182,11 +207,23 @@ VanitySearch::VanitySearch(Secp256K1 *secp, vector<std::string> &inputPrefixes,s
 
       } else {
 
-        if (initPrefix(inputPrefixes[i], &it)) {
-          bool *found = new bool;
-          *found = false;
-          it.found = found;
-          itPrefixes.push_back(it);
+        if (suffixStr.empty()) {
+          if (initPrefix(prefixStr, &it)) {
+            bool *found = new bool;
+            *found = false;
+            it.found = found;
+            it.suffix = NULL;
+            it.suffixLength = 0;
+            itPrefixes.push_back(it);
+          }
+        } else {
+          if (initPrefixSuffix(prefixStr, suffixStr, &it)) {
+            bool *found = new bool;
+            *found = false;
+            it.found = found;
+            it.suffix = strdup(it.suffix);
+            itPrefixes.push_back(it);
+          }
         }
 
       }
@@ -573,6 +610,69 @@ bool VanitySearch::initPrefix(std::string &prefix,PREFIX_ITEM *it) {
 
 // ----------------------------------------------------------------------------
 
+bool VanitySearch::initPrefixSuffix(std::string &prefix, std::string &suffix, PREFIX_ITEM *it) {
+
+  // Initialize prefix first
+  if (!initPrefix(prefix, it)) {
+    return false;
+  }
+
+  // Validate suffix
+  if (suffix.length() == 0) {
+    it->suffix = NULL;
+    it->suffixLength = 0;
+    return true;
+  }
+
+  // Check suffix length
+  if (suffix.length() > 34) { // Max address length is 34 for P2PKH
+    printf("Ignoring suffix \"%s\" (too long, max 34 chars)\n", suffix.c_str());
+    return false;
+  }
+
+  // Store suffix (will be copied later when adding to vector)
+  it->suffix = (char *)suffix.c_str();
+  it->suffixLength = (int)suffix.length();
+
+  // Adjust difficulty based on suffix
+  // Suffix adds complexity: 58^(suffix_length) for Base58 addresses
+  if (searchType == P2PKH || searchType == P2SH) {
+    it->difficulty *= pow(58, suffix.length());
+  } else if (searchType == BECH32) {
+    // Bech32 uses 32 characters: 023456789acdefghjklmnpqrstuvwxyz
+    it->difficulty *= pow(32, suffix.length());
+  }
+
+  return true;
+
+}
+
+// ----------------------------------------------------------------------------
+
+bool VanitySearch::prefixSuffixMatch(char *prefix, int prefixLen, char *suffix, int suffixLen, char *addr) {
+
+  int addrLen = (int)strlen(addr);
+
+  // Check prefix
+  if (strncmp(prefix, addr, prefixLen) != 0) {
+    return false;
+  }
+
+  // Check suffix if present
+  if (suffix != NULL && suffixLen > 0) {
+    if (addrLen < suffixLen) {
+      return false;
+    }
+    const char *addrSuffix = addr + (addrLen - suffixLen);
+    return (strncmp(suffix, addrSuffix, suffixLen) == 0);
+  }
+
+  return true;
+
+}
+
+// ----------------------------------------------------------------------------
+
 void VanitySearch::dumpPrefixes() {
 
   for (int i = 0; i < 0xFFFF; i++) {
@@ -943,16 +1043,40 @@ void VanitySearch::checkAddr(int prefIdx, uint8_t *hash160, Int &key, int32_t in
 
     for (int i = 0; i < (int)inputPrefixes.size(); i++) {
 
-      if (Wildcard::match(addr.c_str(), inputPrefixes[i].c_str(), caseSensitive)) {
+      string pattern = inputPrefixes[i];
+      bool matches = false;
 
+      // Check if pattern contains * separator for prefix*suffix
+      size_t starPos = pattern.find('*');
+      if (starPos != string::npos && starPos < pattern.length() - 1) {
+        // Pattern with prefix and suffix
+        string prefixPattern = pattern.substr(0, starPos);
+        string suffixPattern = pattern.substr(starPos + 1);
+        
+        // Check prefix match
+        bool prefixMatch = Wildcard::match(addr.c_str(), prefixPattern.c_str(), caseSensitive);
+        
+        if (prefixMatch) {
+          // Check suffix match
+          int addrLen = (int)addr.length();
+          int suffixLen = (int)suffixPattern.length();
+          if (addrLen >= suffixLen) {
+            string addrSuffix = addr.substr(addrLen - suffixLen);
+            matches = Wildcard::match(addrSuffix.c_str(), suffixPattern.c_str(), caseSensitive);
+          }
+        }
+      } else {
+        // Standard wildcard pattern (no suffix)
+        matches = Wildcard::match(addr.c_str(), pattern.c_str(), caseSensitive);
+      }
+
+      if (matches) {
         // Found it !
-        //*((*pi)[i].found) = true;
         if (checkPrivKey(addr, key, incr, endomorphism, mode)) {
           nbFoundKey++;
           patternFound[i] = true;
           updateFound();
         }
-
       }
 
     }
@@ -997,16 +1121,31 @@ void VanitySearch::checkAddr(int prefIdx, uint8_t *hash160, Int &key, int32_t in
       if (stopWhenFound && *((*pi)[i].found))
         continue;
 
+      // Check prefix
       strncpy(a, addr.c_str(), (*pi)[i].prefixLength);
       a[(*pi)[i].prefixLength] = 0;
 
       if (strcmp((*pi)[i].prefix, a) == 0) {
 
-        // Found it !
-        *((*pi)[i].found) = true;
-        if (checkPrivKey(addr, key, incr, endomorphism, mode)) {
-          nbFoundKey++;
-          updateFound();
+        // Check suffix if present
+        bool suffixMatch = true;
+        if ((*pi)[i].suffix != NULL && (*pi)[i].suffixLength > 0) {
+          int addrLen = (int)addr.length();
+          if (addrLen >= (*pi)[i].suffixLength) {
+            const char *addrSuffix = addr.c_str() + (addrLen - (*pi)[i].suffixLength);
+            suffixMatch = (strncmp((*pi)[i].suffix, addrSuffix, (*pi)[i].suffixLength) == 0);
+          } else {
+            suffixMatch = false;
+          }
+        }
+
+        if (suffixMatch) {
+          // Found it !
+          *((*pi)[i].found) = true;
+          if (checkPrivKey(addr, key, incr, endomorphism, mode)) {
+            nbFoundKey++;
+            updateFound();
+          }
         }
 
       }

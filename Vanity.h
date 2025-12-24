@@ -49,6 +49,8 @@ typedef struct {
 
   char *prefix;
   int prefixLength;
+  char *suffix;
+  int suffixLength;
   prefix_t sPrefix;
   double difficulty;
   bool *found;
@@ -101,6 +103,7 @@ private:
   uint64_t getGPUCount();
   uint64_t getCPUCount();
   bool initPrefix(std::string &prefix, PREFIX_ITEM *it);
+  bool initPrefixSuffix(std::string &prefix, std::string &suffix, PREFIX_ITEM *it);
   void dumpPrefixes();
   double getDiffuclty();
   void updateFound();
@@ -108,6 +111,7 @@ private:
   void getGPUStartingKeys(int thId, int groupSize, int nbThread, Int *keys, Point *p);
   void enumCaseUnsentivePrefix(std::string s, std::vector<std::string> &list);
   bool prefixMatch(char *prefix, char *addr);
+  bool prefixSuffixMatch(char *prefix, int prefixLen, char *suffix, int suffixLen, char *addr);
 
   Secp256K1 *secp;
   Int startKey;
