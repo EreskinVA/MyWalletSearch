@@ -1130,6 +1130,15 @@ bool VanitySearch::checkPositionalMask(const std::string &addr, const POSITIONAL
 
 void VanitySearch::checkAddr(int prefIdx, uint8_t *hash160, Int &key, int32_t incr, int endomorphism, bool mode) {
 
+  // Временное логирование первых нескольких проверок для отладки
+  static int debugCount = 0;
+  if (debugCount < 5) {
+    string addr = secp->GetAddress(searchType, mode, hash160);
+    printf("\n[DEBUG checkAddr #%d] Checking address: %s (key: %s, incr: %d, endo: %d, mode: %d)\n", 
+           debugCount, addr.c_str(), key.GetBase16().c_str(), incr, endomorphism, mode);
+    debugCount++;
+  }
+
   if (hasPattern) {
 
     // Wildcard search
@@ -1847,12 +1856,22 @@ void VanitySearch::getGPUStartingKeys(int thId, int groupSize, int nbThread, Int
   for (int i = 0; i < nbThread; i++) {
     // Use segment search if enabled (GPU integration)
     if (useSeg && segSearch != NULL) {
+      // Для GPU используем глобальный thread ID: thId * nbThread + i
       if (!segSearch->GetStartingKey(thId * nbThread + i, keys[i])) {
         // Fallback to standard method if segment search fails
         keys[i].Rand(256);
       }
+      // НЕ добавляем дополнительные offset'ы для сегментного поиска,
+      // так как GetStartingKey уже добавляет offset на основе threadId
+      // Но все равно нужно добавить groupSize/2 для правильного позиционирования в группе
     } else if (rekey > 0) {
       keys[i].Rand(256);
+      Int offT((uint64_t)i);
+      offT.ShiftL(80);
+      Int offG((uint64_t)thId);
+      offG.ShiftL(112);
+      keys[i].Add(&offT);
+      keys[i].Add(&offG);
     } else {
       keys[i].Set(&startKey);
       Int offT((uint64_t)i);
@@ -1891,6 +1910,21 @@ void VanitySearch::FindKeyGPU(TH_PARAM *ph) {
   counters[thId] = 0;
 
   getGPUStartingKeys(thId, g.GetGroupSize(), nbThread, keys, p);
+  
+  // Отладочное логирование: выводим первые ключи из сегментов
+  static bool debugKeysLogged = false;
+  if (!debugKeysLogged && useSegmentSearch && segmentSearch != NULL) {
+    printf("[DEBUG GPU] First keys from segments (thread %d):\n", thId);
+    for (int i = 0; i < nbThread && i < 3; i++) {
+      Int testKey;
+      testKey.Set(keys + i);
+      printf("[DEBUG GPU]   Key[%d]: %s\n", i, testKey.GetBase16().c_str());
+      Point testP = secp->ComputePublicKey(&testKey);
+      string testAddr = secp->GetAddress(searchType, true, testP);
+      printf("[DEBUG GPU]   Address[%d]: %s\n", i, testAddr.c_str());
+    }
+    debugKeysLogged = true;
+  }
 
   g.SetSearchMode(searchMode);
   g.SetSearchType(searchType);
