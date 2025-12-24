@@ -1896,10 +1896,6 @@ void VanitySearch::getGPUStartingKeys(int thId, int groupSize, int nbThread, Int
     p[i] = secp->ComputePublicKey(&k);
     if (startPubKeySpecified)
       p[i] = secp->AddDirect(p[i], startPubKey);
-    
-    // ВАЖНО: Обновляем keys[i], чтобы он соответствовал реальному ключу, 
-    // используемому GPU kernel (с добавлением groupSize/2)
-    keys[i].Add((uint64_t)(groupSize / 2));
   }
 
 }
