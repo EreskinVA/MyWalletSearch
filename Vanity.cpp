@@ -1562,9 +1562,27 @@ void VanitySearch::checkAddressesSSE(bool compressed,Int key, int i, Point p1, P
 // ----------------------------------------------------------------------------
 void VanitySearch::getCPUStartingKey(int thId,Int& key,Point& startP) {
 
-  // Use segment search if enabled
+  // Use segment search if enabled (thread-safe access)
+  SegmentSearch *segSearch = NULL;
+  bool useSeg = false;
+  
+#ifndef WIN64
+  pthread_mutex_lock(&ghMutex);
+#else
+  WaitForSingleObject(ghMutex, INFINITE);
+#endif
   if (useSegmentSearch && segmentSearch != NULL) {
-    if (!segmentSearch->GetStartingKey(thId, key)) {
+    segSearch = segmentSearch;
+    useSeg = true;
+  }
+#ifndef WIN64
+  pthread_mutex_unlock(&ghMutex);
+#else
+  ReleaseMutex(ghMutex);
+#endif
+  
+  if (useSeg && segSearch != NULL) {
+    if (!segSearch->GetStartingKey(thId, key)) {
       // Fallback to standard method if segment search fails
       key.Rand(256);
     }
@@ -1774,9 +1792,27 @@ void VanitySearch::FindKeyCPU(TH_PARAM *ph) {
     key.Add((uint64_t)CPU_GRP_SIZE);
     counters[thId]+= 6*CPU_GRP_SIZE; // Point + endo #1 + endo #2 + Symetric point + endo #1 + endo #2
     
-    // Update segment search progress
+    // Update segment search progress (thread-safe access)
+    SegmentSearch *segSearch = NULL;
+    bool useSeg = false;
+    
+#ifndef WIN64
+    pthread_mutex_lock(&ghMutex);
+#else
+    WaitForSingleObject(ghMutex, INFINITE);
+#endif
     if (useSegmentSearch && segmentSearch != NULL) {
-      segmentSearch->UpdateProgress(thId, 6*CPU_GRP_SIZE);
+      segSearch = segmentSearch;
+      useSeg = true;
+    }
+#ifndef WIN64
+    pthread_mutex_unlock(&ghMutex);
+#else
+    ReleaseMutex(ghMutex);
+#endif
+    
+    if (useSeg && segSearch != NULL) {
+      segSearch->UpdateProgress(thId, 6*CPU_GRP_SIZE);
     }
 
   }
@@ -1789,10 +1825,29 @@ void VanitySearch::FindKeyCPU(TH_PARAM *ph) {
 
 void VanitySearch::getGPUStartingKeys(int thId, int groupSize, int nbThread, Int *keys, Point *p) {
 
+  // Thread-safe access to segmentSearch
+  SegmentSearch *segSearch = NULL;
+  bool useSeg = false;
+  
+#ifndef WIN64
+  pthread_mutex_lock(&ghMutex);
+#else
+  WaitForSingleObject(ghMutex, INFINITE);
+#endif
+  if (useSegmentSearch && segmentSearch != NULL) {
+    segSearch = segmentSearch;
+    useSeg = true;
+  }
+#ifndef WIN64
+  pthread_mutex_unlock(&ghMutex);
+#else
+  ReleaseMutex(ghMutex);
+#endif
+  
   for (int i = 0; i < nbThread; i++) {
     // Use segment search if enabled (GPU integration)
-    if (useSegmentSearch && segmentSearch != NULL) {
-      if (!segmentSearch->GetStartingKey(thId * nbThread + i, keys[i])) {
+    if (useSeg && segSearch != NULL) {
+      if (!segSearch->GetStartingKey(thId * nbThread + i, keys[i])) {
         // Fallback to standard method if segment search fails
         keys[i].Rand(256);
       }
@@ -1879,9 +1934,27 @@ void VanitySearch::FindKeyGPU(TH_PARAM *ph) {
       }
       counters[thId] += 6ULL * STEP_SIZE * nbThread; // Point +  endo1 + endo2 + symetrics
       
-      // Update progress for GPU thread (if enabled)
+      // Update progress for GPU thread (if enabled, thread-safe access)
+      SegmentSearch *segSearch = NULL;
+      bool useSeg = false;
+      
+#ifndef WIN64
+      pthread_mutex_lock(&ghMutex);
+#else
+      WaitForSingleObject(ghMutex, INFINITE);
+#endif
       if (useSegmentSearch && segmentSearch != NULL) {
-        segmentSearch->UpdateProgress(thId, 6ULL * STEP_SIZE * nbThread);
+        segSearch = segmentSearch;
+        useSeg = true;
+      }
+#ifndef WIN64
+      pthread_mutex_unlock(&ghMutex);
+#else
+      ReleaseMutex(ghMutex);
+#endif
+      
+      if (useSeg && segSearch != NULL) {
+        segSearch->UpdateProgress(thId, 6ULL * STEP_SIZE * nbThread);
       }
     }
 
@@ -1971,6 +2044,13 @@ void VanitySearch::Search(int nbThread,std::vector<int> gpuId,std::vector<int> g
 
   printf("Number of CPU thread: %d\n", nbCPUThread);
 
+  // Initialize mutex BEFORE creating threads
+#ifndef WIN64
+  pthread_mutex_init(&ghMutex, NULL);
+#else
+  ghMutex = CreateMutex(NULL, FALSE, NULL);
+#endif
+
   TH_PARAM *params = (TH_PARAM *)malloc((nbCPUThread + nbGPUThread) * sizeof(TH_PARAM));
   memset(params,0,(nbCPUThread + nbGPUThread) * sizeof(TH_PARAM));
 
@@ -1983,11 +2063,9 @@ void VanitySearch::Search(int nbThread,std::vector<int> gpuId,std::vector<int> g
 #ifdef WIN64
     DWORD thread_id;
     CreateThread(NULL, 0, _FindKey, (void*)(params+i), 0, &thread_id);
-    ghMutex = CreateMutex(NULL, FALSE, NULL);
 #else
     pthread_t thread_id;
     pthread_create(&thread_id, NULL, &_FindKey, (void*)(params+i));
-    ghMutex = PTHREAD_MUTEX_INITIALIZER;
 #endif
   }
 
@@ -2070,9 +2148,27 @@ void VanitySearch::Search(int nbThread,std::vector<int> gpuId,std::vector<int> g
         avgKeyRate / 1000000.0, avgGpuKeyRate / 1000000.0,
           log2((double)count), GetExpectedTime(avgKeyRate, (double)count).c_str(),nbFoundKey);
       
-      // Segment search progress info
+      // Segment search progress info (thread-safe access)
+      SegmentSearch *segSearch = NULL;
+      bool useSeg = false;
+      
+#ifndef WIN64
+      pthread_mutex_lock(&ghMutex);
+#else
+      WaitForSingleObject(ghMutex, INFINITE);
+#endif
       if (useSegmentSearch && segmentSearch != NULL) {
-        int activeSegs = segmentSearch->GetActiveSegmentCount();
+        segSearch = segmentSearch;
+        useSeg = true;
+      }
+#ifndef WIN64
+      pthread_mutex_unlock(&ghMutex);
+#else
+      ReleaseMutex(ghMutex);
+#endif
+      
+      if (useSeg && segSearch != NULL) {
+        int activeSegs = segSearch->GetActiveSegmentCount();
         if (activeSegs > 0) {
           printf("[Segments: %d active]", activeSegs);
           
@@ -2081,7 +2177,7 @@ void VanitySearch::Search(int nbThread,std::vector<int> gpuId,std::vector<int> g
           time_t now = time(NULL);
           if (now - lastProgressLog >= 30) {
             // Получаем общий прогресс из SegmentSearch
-            double overallProgress = segmentSearch->GetOverallProgress();
+            double overallProgress = segSearch->GetOverallProgress();
             printf("\n[ProgressManager] Общий прогресс: %.2f%% | Активных сегментов: %d",
                    overallProgress, activeSegs);
             lastProgressLog = now;
@@ -2098,9 +2194,27 @@ void VanitySearch::Search(int nbThread,std::vector<int> gpuId,std::vector<int> g
       }
     }
     
-    // Perform load balancing if enabled
+    // Perform load balancing if enabled (thread-safe access)
+    SegmentSearch *segSearch = NULL;
+    bool useSeg = false;
+    
+#ifndef WIN64
+    pthread_mutex_lock(&ghMutex);
+#else
+    WaitForSingleObject(ghMutex, INFINITE);
+#endif
     if (useSegmentSearch && segmentSearch != NULL) {
-      segmentSearch->PerformRebalance();
+      segSearch = segmentSearch;
+      useSeg = true;
+    }
+#ifndef WIN64
+    pthread_mutex_unlock(&ghMutex);
+#else
+    ReleaseMutex(ghMutex);
+#endif
+    
+    if (useSeg && segSearch != NULL) {
+      segSearch->PerformRebalance();
     }
 
     lastCount = count;
@@ -2110,6 +2224,13 @@ void VanitySearch::Search(int nbThread,std::vector<int> gpuId,std::vector<int> g
   }
 
   free(params);
+  
+  // Cleanup mutex
+#ifndef WIN64
+  pthread_mutex_destroy(&ghMutex);
+#else
+  CloseHandle(ghMutex);
+#endif
 
 }
 
