@@ -372,7 +372,8 @@ bool SegmentSearch::GetStartingKey(int threadId, Int &key) {
   
   // Добавляем смещение для потока, чтобы потоки не искали в одном месте
   Int offset((int64_t)threadId);
-  offset.ShiftL(32);  // Смещение на основе ID потока
+  // Важно: не используем огромное смещение (<<32), чтобы не улетать за пределы маленьких сегментов.
+  // Достаточно разнести потоки на несколько первых ключей.
   key.Add(&offset);
   
 #ifndef WIN64
@@ -780,6 +781,28 @@ void SegmentSearch::UpdateProgress(int threadId, uint64_t keysChecked) {
   }
   
   if (segIdx >= 0 && segIdx < (int)segments.size()) {
+    // Обновляем текущую позицию сегмента, чтобы прогресс/движение UP/DOWN было корректным.
+    // В VanitySearch счётчик keysChecked обычно учитывает 6 вариантов (point + endo1 + endo2 + sym + ...),
+    // поэтому один "шаг" по скаляру ≈ keysChecked/6.
+    uint64_t scalarStep = keysChecked / 6ULL;
+    if (scalarStep > 0) {
+      if (segments[segIdx].direction == DIRECTION_UP) {
+        segments[segIdx].currentKey.Add(scalarStep);
+        if (segments[segIdx].currentKey.IsGreater(&segments[segIdx].rangeEnd)) {
+          segments[segIdx].active = false;
+          activeSegments--;
+          printf("[SegmentSearch] Сегмент %s завершен (поиск вверх)\n", segments[segIdx].name.c_str());
+        }
+      } else {
+        segments[segIdx].currentKey.Sub(scalarStep);
+        if (segments[segIdx].currentKey.IsLower(&segments[segIdx].rangeStart)) {
+          segments[segIdx].active = false;
+          activeSegments--;
+          printf("[SegmentSearch] Сегмент %s завершен (поиск вниз)\n", segments[segIdx].name.c_str());
+        }
+      }
+    }
+
     ProgressManager::UpdateSegmentProgress(currentProgress, segIdx, 
                                             segments[segIdx].currentKey, keysChecked);
     keysCheckedSinceLastSave += keysChecked;
@@ -894,11 +917,7 @@ bool SegmentSearch::ShouldAutoSave() {
 }
 
 void SegmentSearch::ExportToProgress() {
-#ifndef WIN64
-  pthread_mutex_lock(&mutex);
-#else
-  WaitForSingleObject(mutex, INFINITE);
-#endif
+  // NOTE: caller must hold `mutex`
   
   currentProgress.bitRange = bitRange;
   // НЕ очищаем segments - сохраняем существующие значения keysChecked
@@ -924,27 +943,12 @@ void SegmentSearch::ExportToProgress() {
       currentProgress.segments.push_back(sp);
     }
   }
-  
-#ifndef WIN64
-  pthread_mutex_unlock(&mutex);
-#else
-  ReleaseMutex(mutex);
-#endif
 }
 
 void SegmentSearch::ImportFromProgress() {
-#ifndef WIN64
-  pthread_mutex_lock(&mutex);
-#else
-  WaitForSingleObject(mutex, INFINITE);
-#endif
+  // NOTE: caller must hold `mutex`
   
   if (currentProgress.segments.size() != segments.size()) {
-#ifndef WIN64
-    pthread_mutex_unlock(&mutex);
-#else
-    ReleaseMutex(mutex);
-#endif
     printf("[SegmentSearch] Предупреждение: количество сегментов не совпадает\n");
     return;
   }
@@ -962,12 +966,6 @@ void SegmentSearch::ImportFromProgress() {
     segNames.push_back(sp.name);
     keysChecked.push_back(sp.keysChecked);
   }
-  
-#ifndef WIN64
-  pthread_mutex_unlock(&mutex);
-#else
-  ReleaseMutex(mutex);
-#endif
   
   for (size_t i = 0; i < segNames.size(); i++) {
     printf("[SegmentSearch] Восстановлен сегмент %s: %llu ключей проверено\n",
