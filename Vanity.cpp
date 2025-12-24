@@ -27,6 +27,7 @@
 #include <string.h>
 #include <math.h>
 #include <algorithm>
+#include <cctype>
 #ifndef WIN64
 #include <pthread.h>
 #endif
@@ -118,6 +119,17 @@ VanitySearch::VanitySearch(Secp256K1 *secp, vector<std::string> &inputPrefixes,s
   for (int i = 0; i < (int)inputPrefixes.size() && !hasPattern; i++) {
     hasPattern = ((inputPrefixes[i].find('*') != std::string::npos) ||
                    (inputPrefixes[i].find('?') != std::string::npos) );
+  }
+  
+  // Парсим позиционные маски для всех паттернов
+  positionalMasks.clear();
+  for (int i = 0; i < (int)inputPrefixes.size(); i++) {
+    POSITIONAL_MASK mask = parsePositionalMask(inputPrefixes[i]);
+    positionalMasks.push_back(mask);
+    if (mask.isValid) {
+      printf("[PositionalMask] Паттерн %d: найдено %zu фиксированных позиций\n", 
+             i, mask.fixedPositions.size());
+    }
   }
 
   if (!hasPattern) {
@@ -1034,6 +1046,88 @@ void VanitySearch::checkAddrSSE(uint8_t *h1, uint8_t *h2, uint8_t *h3, uint8_t *
 
 }
 
+// ----------------------------------------------------------------------------
+// Позиционные маски: парсинг паттерна с фиксированными позициями
+// Пример: "1PW***e**j*G**********4C*as*****XU"
+// Извлекает все фиксированные символы и их позиции
+// ----------------------------------------------------------------------------
+POSITIONAL_MASK VanitySearch::parsePositionalMask(const std::string &pattern) {
+  POSITIONAL_MASK mask;
+  mask.isValid = false;
+  mask.totalLength = (int)pattern.length();
+  mask.fixedPositions.clear();
+  
+  // Проверяем, является ли паттерн позиционной маской
+  // Позиционная маска должна содержать только символы Base58 и звездочки
+  bool hasStars = false;
+  bool hasFixedChars = false;
+  
+  for (size_t i = 0; i < pattern.length(); i++) {
+    char c = pattern[i];
+    
+    if (c == '*') {
+      hasStars = true;
+    } else if ((c >= '1' && c <= '9') || 
+               (c >= 'A' && c <= 'H') || (c >= 'J' && c <= 'N') || (c >= 'P' && c <= 'Z') ||
+               (c >= 'a' && c <= 'k') || (c >= 'm' && c <= 'z')) {
+      // Это фиксированный символ Base58
+      hasFixedChars = true;
+      POSITIONAL_MASK_ITEM item;
+      item.position = (int)i;
+      item.character = caseSensitive ? c : tolower(c);
+      mask.fixedPositions.push_back(item);
+    } else if (c == '?' || c == '0' || c == 'O' || c == 'I' || c == 'l') {
+      // '?' - wildcard, '0', 'O', 'I', 'l' - не используются в Base58, но могут быть в паттерне
+      // Игнорируем для позиционной маски
+    } else {
+      // Неизвестный символ - не валидная позиционная маска
+      return mask;
+    }
+  }
+  
+  // Позиционная маска должна содержать и звездочки, и фиксированные символы
+  mask.isValid = (hasStars && hasFixedChars && mask.fixedPositions.size() > 0);
+  
+  return mask;
+}
+
+// ----------------------------------------------------------------------------
+// Проверка адреса на соответствие позиционной маске
+// Раннее отсечение: проверяем фиксированные позиции ДО полной проверки
+// ----------------------------------------------------------------------------
+bool VanitySearch::checkPositionalMask(const std::string &addr, const POSITIONAL_MASK &mask) {
+  if (!mask.isValid) {
+    return false;
+  }
+  
+  // Проверяем длину
+  if ((int)addr.length() != mask.totalLength) {
+    return false;
+  }
+  
+  // Раннее отсечение: проверяем все фиксированные позиции
+  for (size_t i = 0; i < mask.fixedPositions.size(); i++) {
+    int pos = mask.fixedPositions[i].position;
+    char expected = mask.fixedPositions[i].character;
+    
+    if (pos >= (int)addr.length()) {
+      return false;
+    }
+    
+    char actual = caseSensitive ? addr[pos] : tolower(addr[pos]);
+    
+    if (actual != expected) {
+      // Не совпадает фиксированная позиция - раннее отсечение!
+      return false;
+    }
+  }
+  
+  // Все фиксированные позиции совпали
+  return true;
+}
+
+// ----------------------------------------------------------------------------
+
 void VanitySearch::checkAddr(int prefIdx, uint8_t *hash160, Int &key, int32_t incr, int endomorphism, bool mode) {
 
   if (hasPattern) {
@@ -1046,28 +1140,46 @@ void VanitySearch::checkAddr(int prefIdx, uint8_t *hash160, Int &key, int32_t in
       string pattern = inputPrefixes[i];
       bool matches = false;
 
-      // Check if pattern contains * separator for prefix*suffix
-      size_t starPos = pattern.find('*');
-      if (starPos != string::npos && starPos < pattern.length() - 1) {
-        // Pattern with prefix and suffix
-        string prefixPattern = pattern.substr(0, starPos);
-        string suffixPattern = pattern.substr(starPos + 1);
-        
-        // Check prefix match
-        bool prefixMatch = Wildcard::match(addr.c_str(), prefixPattern.c_str(), caseSensitive);
-        
-        if (prefixMatch) {
-          // Check suffix match
-          int addrLen = (int)addr.length();
-          int suffixLen = (int)suffixPattern.length();
-          if (addrLen >= suffixLen) {
-            string addrSuffix = addr.substr(addrLen - suffixLen);
-            matches = Wildcard::match(addrSuffix.c_str(), suffixPattern.c_str(), caseSensitive);
-          }
+      // ПРИОРИТЕТ 1: Проверка позиционной маски (раннее отсечение)
+      if (i < (int)positionalMasks.size() && positionalMasks[i].isValid) {
+        // Используем позиционную маску для раннего отсечения
+        if (!checkPositionalMask(addr, positionalMasks[i])) {
+          // Раннее отсечение: фиксированные позиции не совпали
+          continue; // Переходим к следующему паттерну
         }
-      } else {
-        // Standard wildcard pattern (no suffix)
+        // Все фиксированные позиции совпали, проверяем полный паттерн через Wildcard
         matches = Wildcard::match(addr.c_str(), pattern.c_str(), caseSensitive);
+      } else {
+        // Стандартная проверка для паттернов без позиционной маски
+        // Check if pattern contains multiple * (complex mask with intermediate characters)
+        size_t firstStar = pattern.find('*');
+        size_t lastStar = pattern.rfind('*');
+        
+        if (firstStar != string::npos && firstStar != lastStar) {
+          // Complex pattern with multiple stars (e.g., "1PW*3*U" or "1PWo3Je*9jr*VzXU")
+          // Use full wildcard matching on entire address
+          matches = Wildcard::match(addr.c_str(), pattern.c_str(), caseSensitive);
+        } else if (firstStar != string::npos && firstStar < pattern.length() - 1) {
+          // Simple pattern with single * separator (prefix*suffix) - optimized path
+          string prefixPattern = pattern.substr(0, firstStar);
+          string suffixPattern = pattern.substr(firstStar + 1);
+          
+          // Check prefix match
+          bool prefixMatch = Wildcard::match(addr.c_str(), prefixPattern.c_str(), caseSensitive);
+          
+          if (prefixMatch) {
+            // Check suffix match
+            int addrLen = (int)addr.length();
+            int suffixLen = (int)suffixPattern.length();
+            if (addrLen >= suffixLen) {
+              string addrSuffix = addr.substr(addrLen - suffixLen);
+              matches = Wildcard::match(addrSuffix.c_str(), suffixPattern.c_str(), caseSensitive);
+            }
+          }
+        } else {
+          // Standard wildcard pattern (no suffix, possibly with ? wildcards)
+          matches = Wildcard::match(addr.c_str(), pattern.c_str(), caseSensitive);
+        }
       }
 
       if (matches) {

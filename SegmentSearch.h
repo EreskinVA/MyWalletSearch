@@ -12,6 +12,11 @@
 #include "KangarooSearch.h"
 #include <vector>
 #include <string>
+#ifndef WIN64
+#include <pthread.h>
+#else
+#include <windows.h>
+#endif
 
 // Направление поиска в сегменте
 enum SearchDirection {
@@ -66,7 +71,7 @@ public:
   void PrintSegments();
   
   // Получить количество активных сегментов
-  int GetActiveSegmentCount() const { return activeSegments; }
+  int GetActiveSegmentCount() const;
   
   // Получить общий прогресс поиска
   double GetOverallProgress();
@@ -113,6 +118,13 @@ private:
   // Search algorithm
   SearchAlgorithm searchAlgorithm;
   KangarooSearch *kangarooSearch;
+  
+  // Thread synchronization
+#ifndef WIN64
+  mutable pthread_mutex_t mutex;
+#else
+  mutable HANDLE mutex;
+#endif
   
   // Вычислить ключ для заданного процента
   void CalculateKeyAtPercent(double percent, Int &result);

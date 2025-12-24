@@ -45,6 +45,18 @@ typedef struct {
 } TH_PARAM;
 
 
+// Позиционная маска: фиксированные символы в определенных позициях
+typedef struct {
+  int position;      // Позиция в адресе (0-based)
+  char character;    // Фиксированный символ в этой позиции
+} POSITIONAL_MASK_ITEM;
+
+typedef struct {
+  std::vector<POSITIONAL_MASK_ITEM> fixedPositions;  // Список фиксированных позиций
+  bool isValid;                                      // Валидна ли маска
+  int totalLength;                                    // Общая длина паттерна
+} POSITIONAL_MASK;
+
 typedef struct {
 
   char *prefix;
@@ -112,6 +124,10 @@ private:
   void enumCaseUnsentivePrefix(std::string s, std::vector<std::string> &list);
   bool prefixMatch(char *prefix, char *addr);
   bool prefixSuffixMatch(char *prefix, int prefixLen, char *suffix, int suffixLen, char *addr);
+  
+  // Позиционные маски: парсинг и проверка
+  POSITIONAL_MASK parsePositionalMask(const std::string &pattern);
+  bool checkPositionalMask(const std::string &addr, const POSITIONAL_MASK &mask);
 
   Secp256K1 *secp;
   Int startKey;
@@ -142,6 +158,9 @@ private:
   std::vector<prefix_t> usedPrefix;
   std::vector<LPREFIX> usedPrefixL;
   std::vector<std::string> &inputPrefixes;
+  
+  // Позиционные маски для каждого паттерна
+  std::vector<POSITIONAL_MASK> positionalMasks;
 
   Int beta;
   Int lambda;

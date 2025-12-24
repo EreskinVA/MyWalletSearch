@@ -8,6 +8,11 @@
 #include <sstream>
 #include <iostream>
 #include <algorithm>
+#ifndef WIN64
+#include <pthread.h>
+#else
+#include <windows.h>
+#endif
 
 SegmentSearch::SegmentSearch() {
   bitRange = 0;
@@ -19,9 +24,20 @@ SegmentSearch::SegmentSearch() {
   loadBalancingEnabled = false;
   searchAlgorithm = ALGORITHM_STANDARD;  // По умолчанию стандартный
   kangarooSearch = NULL;
+#ifndef WIN64
+  pthread_mutex_init(&mutex, NULL);
+#else
+  mutex = CreateMutex(NULL, FALSE, NULL);
+#endif
 }
 
 SegmentSearch::~SegmentSearch() {
+#ifndef WIN64
+  pthread_mutex_lock(&mutex);
+#else
+  WaitForSingleObject(mutex, INFINITE);
+#endif
+  
   segments.clear();
   if (progressManager != NULL) {
     delete progressManager;
@@ -35,10 +51,24 @@ SegmentSearch::~SegmentSearch() {
     delete kangarooSearch;
     kangarooSearch = NULL;
   }
+  
+#ifndef WIN64
+  pthread_mutex_unlock(&mutex);
+  pthread_mutex_destroy(&mutex);
+#else
+  ReleaseMutex(mutex);
+  CloseHandle(mutex);
+#endif
 }
 
 void SegmentSearch::AddSegment(double startPercent, double endPercent, 
                                 SearchDirection direction, const std::string &name) {
+#ifndef WIN64
+  pthread_mutex_lock(&mutex);
+#else
+  WaitForSingleObject(mutex, INFINITE);
+#endif
+  
   SearchSegment seg;
   seg.startPercent = startPercent;
   seg.endPercent = endPercent;
@@ -49,9 +79,17 @@ void SegmentSearch::AddSegment(double startPercent, double endPercent,
   segments.push_back(seg);
   activeSegments++;
   
+  std::string segName = seg.name;
+  std::string dirStr = (direction == DIRECTION_UP ? "ВВЕРХ" : "ВНИЗ");
+  
+#ifndef WIN64
+  pthread_mutex_unlock(&mutex);
+#else
+  ReleaseMutex(mutex);
+#endif
+  
   printf("[SegmentSearch] Добавлен сегмент: %s (%.2f%% -> %.2f%%, направление: %s)\n",
-         seg.name.c_str(), startPercent, endPercent, 
-         direction == DIRECTION_UP ? "ВВЕРХ" : "ВНИЗ");
+         segName.c_str(), startPercent, endPercent, dirStr.c_str());
 }
 
 bool SegmentSearch::LoadSegmentsFromFile(const std::string &filename) {
@@ -141,6 +179,12 @@ void SegmentSearch::CalculateKeyAtPercent(double percent, Int &result) {
 }
 
 void SegmentSearch::InitializeSegments(int bits) {
+#ifndef WIN64
+  pthread_mutex_lock(&mutex);
+#else
+  WaitForSingleObject(mutex, INFINITE);
+#endif
+  
   bitRange = bits;
   
   // Вычислить полный диапазон для заданного количества бит
@@ -157,11 +201,14 @@ void SegmentSearch::InitializeSegments(int bits) {
   fullRangeSize.Sub(&fullRangeStart);
   fullRangeSize.AddOne();
   
-  printf("[SegmentSearch] Инициализация для %d-битного диапазона\n", bits);
-  printf("[SegmentSearch] Диапазон: %s\n", fullRangeStart.GetBase16().c_str());
-  printf("[SegmentSearch]      до: %s\n", fullRangeEnd.GetBase16().c_str());
+  std::string startStr = fullRangeStart.GetBase16();
+  std::string endStr = fullRangeEnd.GetBase16();
   
   // Вычислить границы для каждого сегмента
+  std::vector<std::string> segNames;
+  std::vector<std::string> segStartStrs;
+  std::vector<std::string> segEndStrs;
+  
   for (size_t i = 0; i < segments.size(); i++) {
     CalculateKeyAtPercent(segments[i].startPercent, segments[i].rangeStart);
     CalculateKeyAtPercent(segments[i].endPercent, segments[i].rangeEnd);
@@ -173,43 +220,151 @@ void SegmentSearch::InitializeSegments(int bits) {
       segments[i].currentKey.Set(&segments[i].rangeEnd);
     }
     
+    segNames.push_back(segments[i].name);
+    segStartStrs.push_back(segments[i].rangeStart.GetBase16());
+    segEndStrs.push_back(segments[i].rangeEnd.GetBase16());
+  }
+  
+#ifndef WIN64
+  pthread_mutex_unlock(&mutex);
+#else
+  ReleaseMutex(mutex);
+#endif
+  
+  printf("[SegmentSearch] Инициализация для %d-битного диапазона\n", bits);
+  printf("[SegmentSearch] Диапазон: %s\n", startStr.c_str());
+  printf("[SegmentSearch]      до: %s\n", endStr.c_str());
+  
+  for (size_t i = 0; i < segNames.size(); i++) {
     printf("[SegmentSearch] %s: %s -> %s\n", 
-           segments[i].name.c_str(),
-           segments[i].rangeStart.GetBase16().c_str(),
-           segments[i].rangeEnd.GetBase16().c_str());
+           segNames[i].c_str(),
+           segStartStrs[i].c_str(),
+           segEndStrs[i].c_str());
   }
 }
 
+int SegmentSearch::GetActiveSegmentCount() const {
+#ifndef WIN64
+  pthread_mutex_lock((pthread_mutex_t*)&mutex);
+#else
+  WaitForSingleObject(mutex, INFINITE);
+#endif
+  
+  int count = activeSegments;
+  
+#ifndef WIN64
+  pthread_mutex_unlock((pthread_mutex_t*)&mutex);
+#else
+  ReleaseMutex(mutex);
+#endif
+  
+  return count;
+}
+
 int SegmentSearch::GetSegmentForThread(int threadId) {
-  if (segments.empty()) return -1;
+#ifndef WIN64
+  pthread_mutex_lock(&mutex);
+#else
+  WaitForSingleObject(mutex, INFINITE);
+#endif
+  
+  if (segments.empty()) {
+#ifndef WIN64
+    pthread_mutex_unlock(&mutex);
+#else
+    ReleaseMutex(mutex);
+#endif
+    return -1;
+  }
   
   // Использовать балансировщик, если включен
   if (loadBalancingEnabled && loadBalancer != NULL) {
-    return loadBalancer->GetSegmentForThread(threadId);
+    int seg = loadBalancer->GetSegmentForThread(threadId);
+#ifndef WIN64
+    pthread_mutex_unlock(&mutex);
+#else
+    ReleaseMutex(mutex);
+#endif
+    return seg;
   }
   
   // Простое распределение: round-robin по активным сегментам
   int activeCount = 0;
+  int activeSegCount = activeSegments;
   for (size_t i = 0; i < segments.size(); i++) {
     if (segments[i].active) {
-      if (activeCount == (threadId % GetActiveSegmentCount())) {
+      if (activeCount == (threadId % activeSegCount)) {
+#ifndef WIN64
+        pthread_mutex_unlock(&mutex);
+#else
+        ReleaseMutex(mutex);
+#endif
         return i;
       }
       activeCount++;
     }
   }
   
+#ifndef WIN64
+  pthread_mutex_unlock(&mutex);
+#else
+  ReleaseMutex(mutex);
+#endif
   return 0; // Fallback
 }
 
 bool SegmentSearch::GetStartingKey(int threadId, Int &key) {
-  int segIdx = GetSegmentForThread(threadId);
+#ifndef WIN64
+  pthread_mutex_lock(&mutex);
+#else
+  WaitForSingleObject(mutex, INFINITE);
+#endif
+  
+  int segIdx = -1;
+  if (segments.empty()) {
+#ifndef WIN64
+    pthread_mutex_unlock(&mutex);
+#else
+    ReleaseMutex(mutex);
+#endif
+    return false;
+  }
+  
+  // Использовать балансировщик, если включен
+  if (loadBalancingEnabled && loadBalancer != NULL) {
+    segIdx = loadBalancer->GetSegmentForThread(threadId);
+  } else {
+    // Простое распределение: round-robin по активным сегментам
+    int activeCount = 0;
+    int activeSegCount = activeSegments;
+    for (size_t i = 0; i < segments.size(); i++) {
+      if (segments[i].active) {
+        if (activeCount == (threadId % activeSegCount)) {
+          segIdx = i;
+          break;
+        }
+        activeCount++;
+      }
+    }
+    if (segIdx < 0) segIdx = 0;
+  }
+  
   if (segIdx < 0 || segIdx >= (int)segments.size()) {
+#ifndef WIN64
+    pthread_mutex_unlock(&mutex);
+#else
+    ReleaseMutex(mutex);
+#endif
     return false;
   }
   
   SearchSegment &seg = segments[segIdx];
   if (!seg.active) {
+#ifndef WIN64
+    pthread_mutex_unlock(&mutex);
+#else
+    ReleaseMutex(mutex);
+#endif
     return false;
   }
   
@@ -220,17 +375,67 @@ bool SegmentSearch::GetStartingKey(int threadId, Int &key) {
   offset.ShiftL(32);  // Смещение на основе ID потока
   key.Add(&offset);
   
+#ifndef WIN64
+  pthread_mutex_unlock(&mutex);
+#else
+  ReleaseMutex(mutex);
+#endif
+  
   return true;
 }
 
 bool SegmentSearch::GetNextKey(int threadId, Int &key) {
-  int segIdx = GetSegmentForThread(threadId);
+#ifndef WIN64
+  pthread_mutex_lock(&mutex);
+#else
+  WaitForSingleObject(mutex, INFINITE);
+#endif
+  
+  int segIdx = -1;
+  if (segments.empty()) {
+#ifndef WIN64
+    pthread_mutex_unlock(&mutex);
+#else
+    ReleaseMutex(mutex);
+#endif
+    return false;
+  }
+  
+  // Использовать балансировщик, если включен
+  if (loadBalancingEnabled && loadBalancer != NULL) {
+    segIdx = loadBalancer->GetSegmentForThread(threadId);
+  } else {
+    // Простое распределение: round-robin по активным сегментам
+    int activeCount = 0;
+    int activeSegCount = activeSegments;
+    for (size_t i = 0; i < segments.size(); i++) {
+      if (segments[i].active) {
+        if (activeCount == (threadId % activeSegCount)) {
+          segIdx = i;
+          break;
+        }
+        activeCount++;
+      }
+    }
+    if (segIdx < 0) segIdx = 0;
+  }
+  
   if (segIdx < 0 || segIdx >= (int)segments.size()) {
+#ifndef WIN64
+    pthread_mutex_unlock(&mutex);
+#else
+    ReleaseMutex(mutex);
+#endif
     return false;
   }
   
   SearchSegment &seg = segments[segIdx];
   if (!seg.active) {
+#ifndef WIN64
+    pthread_mutex_unlock(&mutex);
+#else
+    ReleaseMutex(mutex);
+#endif
     return false;
   }
   
@@ -239,43 +444,110 @@ bool SegmentSearch::GetNextKey(int threadId, Int &key) {
     if (seg.currentKey.IsGreater(&seg.rangeEnd)) {
       seg.active = false;
       activeSegments--;
-      printf("[SegmentSearch] Сегмент %s завершен (поиск вверх)\n", seg.name.c_str());
+      std::string segName = seg.name;
+#ifndef WIN64
+      pthread_mutex_unlock(&mutex);
+#else
+      ReleaseMutex(mutex);
+#endif
+      printf("[SegmentSearch] Сегмент %s завершен (поиск вверх)\n", segName.c_str());
       return false;
     }
   } else {
     if (seg.currentKey.IsLower(&seg.rangeStart)) {
       seg.active = false;
       activeSegments--;
-      printf("[SegmentSearch] Сегмент %s завершен (поиск вниз)\n", seg.name.c_str());
+      std::string segName = seg.name;
+#ifndef WIN64
+      pthread_mutex_unlock(&mutex);
+#else
+      ReleaseMutex(mutex);
+#endif
+      printf("[SegmentSearch] Сегмент %s завершен (поиск вниз)\n", segName.c_str());
       return false;
     }
   }
   
   key.Set(&seg.currentKey);
+  
+#ifndef WIN64
+  pthread_mutex_unlock(&mutex);
+#else
+  ReleaseMutex(mutex);
+#endif
+  
   return true;
 }
 
 bool SegmentSearch::IsSearchComplete() {
-  return activeSegments == 0;
+#ifndef WIN64
+  pthread_mutex_lock(&mutex);
+#else
+  WaitForSingleObject(mutex, INFINITE);
+#endif
+  
+  bool complete = (activeSegments == 0);
+  
+#ifndef WIN64
+  pthread_mutex_unlock(&mutex);
+#else
+  ReleaseMutex(mutex);
+#endif
+  
+  return complete;
 }
 
 void SegmentSearch::PrintSegments() {
-  printf("\n=== Конфигурация сегментов поиска ===\n");
-  printf("Всего сегментов: %d\n", (int)segments.size());
-  printf("Активных сегментов: %d\n", activeSegments);
-  printf("Битовый диапазон: %d\n\n", bitRange);
+#ifndef WIN64
+  pthread_mutex_lock(&mutex);
+#else
+  WaitForSingleObject(mutex, INFINITE);
+#endif
+  
+  int segCount = segments.size();
+  int activeCount = activeSegments;
+  int bitR = bitRange;
+  
+  std::vector<std::string> segNames;
+  std::vector<double> startPercents;
+  std::vector<double> endPercents;
+  std::vector<std::string> directions;
+  std::vector<bool> actives;
+  std::vector<std::string> startStrs;
+  std::vector<std::string> endStrs;
   
   for (size_t i = 0; i < segments.size(); i++) {
     const SearchSegment &seg = segments[i];
-    printf("Сегмент %zu: %s\n", i + 1, seg.name.c_str());
-    printf("  Диапазон: %.2f%% -> %.2f%%\n", seg.startPercent, seg.endPercent);
-    printf("  Направление: %s\n", seg.direction == DIRECTION_UP ? "ВВЕРХ ↑" : "ВНИЗ ↓");
-    printf("  Статус: %s\n", seg.active ? "Активен" : "Завершен");
+    segNames.push_back(seg.name);
+    startPercents.push_back(seg.startPercent);
+    endPercents.push_back(seg.endPercent);
+    directions.push_back(seg.direction == DIRECTION_UP ? "ВВЕРХ ↑" : "ВНИЗ ↓");
+    actives.push_back(seg.active);
     Int tmp1, tmp2;
     tmp1.Set((Int*)&seg.rangeStart);
     tmp2.Set((Int*)&seg.rangeEnd);
-    printf("  Начало: %s\n", tmp1.GetBase16().c_str());
-    printf("  Конец:  %s\n", tmp2.GetBase16().c_str());
+    startStrs.push_back(tmp1.GetBase16());
+    endStrs.push_back(tmp2.GetBase16());
+  }
+  
+#ifndef WIN64
+  pthread_mutex_unlock(&mutex);
+#else
+  ReleaseMutex(mutex);
+#endif
+  
+  printf("\n=== Конфигурация сегментов поиска ===\n");
+  printf("Всего сегментов: %d\n", segCount);
+  printf("Активных сегментов: %d\n", activeCount);
+  printf("Битовый диапазон: %d\n\n", bitR);
+  
+  for (size_t i = 0; i < segNames.size(); i++) {
+    printf("Сегмент %zu: %s\n", i + 1, segNames[i].c_str());
+    printf("  Диапазон: %.2f%% -> %.2f%%\n", startPercents[i], endPercents[i]);
+    printf("  Направление: %s\n", directions[i].c_str());
+    printf("  Статус: %s\n", actives[i] ? "Активен" : "Завершен");
+    printf("  Начало: %s\n", startStrs[i].c_str());
+    printf("  Конец:  %s\n", endStrs[i].c_str());
     printf("\n");
   }
   
@@ -283,7 +555,20 @@ void SegmentSearch::PrintSegments() {
 }
 
 double SegmentSearch::GetOverallProgress() {
-  if (segments.empty()) return 0.0;
+#ifndef WIN64
+  pthread_mutex_lock(&mutex);
+#else
+  WaitForSingleObject(mutex, INFINITE);
+#endif
+  
+  if (segments.empty()) {
+#ifndef WIN64
+    pthread_mutex_unlock(&mutex);
+#else
+    ReleaseMutex(mutex);
+#endif
+    return 0.0;
+  }
   
   double totalProgress = 0.0;
   for (size_t i = 0; i < segments.size(); i++) {
@@ -326,7 +611,15 @@ double SegmentSearch::GetOverallProgress() {
     totalProgress += segProgress;
   }
   
-  return totalProgress / segments.size();
+  double result = totalProgress / segments.size();
+  
+#ifndef WIN64
+  pthread_mutex_unlock(&mutex);
+#else
+  ReleaseMutex(mutex);
+#endif
+  
+  return result;
 }
 
 void SegmentSearch::EnableProgressSaving(const std::string &progressFile, int autoSaveInterval) {
@@ -346,19 +639,44 @@ bool SegmentSearch::SaveProgress(const std::string &targetAddress) {
     return false;
   }
   
+#ifndef WIN64
+  pthread_mutex_lock(&mutex);
+#else
+  WaitForSingleObject(mutex, INFINITE);
+#endif
+  
   // Инициализация прогресса при первом сохранении
   if (currentProgress.segments.empty() && !segments.empty()) {
     currentProgress = progressManager->CreateProgress(bitRange, targetAddress);
   }
   
-  ExportToProgress();
+  ExportToProgress();  // Уже защищен мьютексом внутри
   currentProgress.targetAddress = targetAddress;
   currentProgress.lastSaveTime = time(NULL);
   
-  bool result = progressManager->SaveProgress(currentProgress);
+  SearchProgress progressCopy = currentProgress;
+  uint64_t keysSinceSave = keysCheckedSinceLastSave;
+  
+#ifndef WIN64
+  pthread_mutex_unlock(&mutex);
+#else
+  ReleaseMutex(mutex);
+#endif
+  
+  bool result = progressManager->SaveProgress(progressCopy);
   if (result) {
     progressManager->MarkSaved();
+#ifndef WIN64
+    pthread_mutex_lock(&mutex);
+#else
+    WaitForSingleObject(mutex, INFINITE);
+#endif
     keysCheckedSinceLastSave = 0;
+#ifndef WIN64
+    pthread_mutex_unlock(&mutex);
+#else
+    ReleaseMutex(mutex);
+#endif
   }
   
   return result;
@@ -374,31 +692,58 @@ bool SegmentSearch::LoadProgress(const std::string &targetAddress) {
     return false;
   }
   
-  if (!progressManager->LoadProgress(currentProgress)) {
+  SearchProgress loadedProgress;
+  if (!progressManager->LoadProgress(loadedProgress)) {
     return false;
   }
   
+#ifndef WIN64
+  pthread_mutex_lock(&mutex);
+#else
+  WaitForSingleObject(mutex, INFINITE);
+#endif
+  
   // Проверка соответствия адреса
-  if (!targetAddress.empty() && currentProgress.targetAddress != targetAddress) {
+  if (!targetAddress.empty() && loadedProgress.targetAddress != targetAddress) {
+#ifndef WIN64
+    pthread_mutex_unlock(&mutex);
+#else
+    ReleaseMutex(mutex);
+#endif
     printf("[SegmentSearch] Предупреждение: целевой адрес не совпадает\n");
-    printf("  В файле: %s\n", currentProgress.targetAddress.c_str());
+    printf("  В файле: %s\n", loadedProgress.targetAddress.c_str());
     printf("  Запрошен: %s\n", targetAddress.c_str());
     printf("  Игнорируем файл прогресса\n");
     return false;
   }
   
   // Проверка битового диапазона
-  if (currentProgress.bitRange != bitRange) {
+  if (loadedProgress.bitRange != bitRange) {
+#ifndef WIN64
+    pthread_mutex_unlock(&mutex);
+#else
+    ReleaseMutex(mutex);
+#endif
     printf("[SegmentSearch] Предупреждение: битовый диапазон не совпадает (%d vs %d)\n",
-           currentProgress.bitRange, bitRange);
+           loadedProgress.bitRange, bitRange);
     return false;
   }
   
+  currentProgress = loadedProgress;
+  
   // Импорт сегментов из прогресса
-  ImportFromProgress();
+  ImportFromProgress();  // Уже защищен мьютексом внутри
+  
+  std::string stats = progressManager->GetProgressStats(currentProgress);
+  
+#ifndef WIN64
+  pthread_mutex_unlock(&mutex);
+#else
+  ReleaseMutex(mutex);
+#endif
   
   printf("[SegmentSearch] ✓ Прогресс восстановлен успешно\n");
-  printf("%s", progressManager->GetProgressStats(currentProgress).c_str());
+  printf("%s", stats.c_str());
   
   return true;
 }
@@ -406,7 +751,34 @@ bool SegmentSearch::LoadProgress(const std::string &targetAddress) {
 void SegmentSearch::UpdateProgress(int threadId, uint64_t keysChecked) {
   if (!progressSavingEnabled) return;
   
-  int segIdx = GetSegmentForThread(threadId);
+#ifndef WIN64
+  pthread_mutex_lock(&mutex);
+#else
+  WaitForSingleObject(mutex, INFINITE);
+#endif
+  
+  int segIdx = -1;
+  if (!segments.empty()) {
+    // Использовать балансировщик, если включен
+    if (loadBalancingEnabled && loadBalancer != NULL) {
+      segIdx = loadBalancer->GetSegmentForThread(threadId);
+    } else {
+      // Простое распределение: round-robin по активным сегментам
+      int activeCount = 0;
+      int activeSegCount = activeSegments;
+      for (size_t i = 0; i < segments.size(); i++) {
+        if (segments[i].active) {
+          if (activeCount == (threadId % activeSegCount)) {
+            segIdx = i;
+            break;
+          }
+          activeCount++;
+        }
+      }
+      if (segIdx < 0) segIdx = 0;
+    }
+  }
+  
   if (segIdx >= 0 && segIdx < (int)segments.size()) {
     ProgressManager::UpdateSegmentProgress(currentProgress, segIdx, 
                                             segments[segIdx].currentKey, keysChecked);
@@ -423,15 +795,43 @@ void SegmentSearch::UpdateProgress(int threadId, uint64_t keysChecked) {
     }
     
     // Автосохранение
-    if (ShouldAutoSave()) {
-      SaveProgress(currentProgress.targetAddress);
+    bool shouldSave = ShouldAutoSave();
+    std::string targetAddr = currentProgress.targetAddress;
+#ifndef WIN64
+    pthread_mutex_unlock(&mutex);
+#else
+    ReleaseMutex(mutex);
+#endif
+    
+    if (shouldSave) {
+      SaveProgress(targetAddr);
     }
+  } else {
+#ifndef WIN64
+    pthread_mutex_unlock(&mutex);
+#else
+    ReleaseMutex(mutex);
+#endif
   }
 }
 
 void SegmentSearch::UpdateKangarooProgress(int segmentIndex, uint64_t totalJumps) {
   if (!progressSavingEnabled) return;
-  if (segmentIndex < 0 || segmentIndex >= (int)segments.size()) return;
+  
+#ifndef WIN64
+  pthread_mutex_lock(&mutex);
+#else
+  WaitForSingleObject(mutex, INFINITE);
+#endif
+  
+  if (segmentIndex < 0 || segmentIndex >= (int)segments.size()) {
+#ifndef WIN64
+    pthread_mutex_unlock(&mutex);
+#else
+    ReleaseMutex(mutex);
+#endif
+    return;
+  }
   
   // Для Kangaroo используем jumps как эквивалент ключей
   // 1 jump ≈ проверка одного ключа в контексте прогресса
@@ -450,20 +850,36 @@ void SegmentSearch::UpdateKangarooProgress(int segmentIndex, uint64_t totalJumps
                                             segments[segmentIndex].currentKey, increment);
     keysCheckedSinceLastSave += increment;
     
+    std::string segName = segments[segmentIndex].name;
+    std::string targetAddr = currentProgress.targetAddress;
+    bool shouldSave = ShouldAutoSave();  // Уже защищен мьютексом внутри
+    
+#ifndef WIN64
+    pthread_mutex_unlock(&mutex);
+#else
+    ReleaseMutex(mutex);
+#endif
+    
     // Периодический вывод прогресса (каждые 1M jumps)
     static uint64_t lastLogJumps = 0;
     if (totalJumps - lastLogJumps >= 1000000) {
       printf("[ProgressManager] Kangaroo: %llu jumps (сегмент %d: %s)\n",
              (unsigned long long)totalJumps,
              segmentIndex,
-             segments[segmentIndex].name.c_str());
+             segName.c_str());
       lastLogJumps = totalJumps;
     }
     
     // Автосохранение
-    if (ShouldAutoSave()) {
-      SaveProgress(currentProgress.targetAddress);
+    if (shouldSave) {
+      SaveProgress(targetAddr);
     }
+  } else {
+#ifndef WIN64
+    pthread_mutex_unlock(&mutex);
+#else
+    ReleaseMutex(mutex);
+#endif
   }
 }
 
@@ -472,10 +888,18 @@ bool SegmentSearch::ShouldAutoSave() {
     return false;
   }
   
+  // progressManager->ShouldSave() не требует синхронизации,
+  // так как он использует только внутренние переменные времени
   return progressManager->ShouldSave();
 }
 
 void SegmentSearch::ExportToProgress() {
+#ifndef WIN64
+  pthread_mutex_lock(&mutex);
+#else
+  WaitForSingleObject(mutex, INFINITE);
+#endif
+  
   currentProgress.bitRange = bitRange;
   // НЕ очищаем segments - сохраняем существующие значения keysChecked
   // Обновляем только изменяемые поля
@@ -500,13 +924,33 @@ void SegmentSearch::ExportToProgress() {
       currentProgress.segments.push_back(sp);
     }
   }
+  
+#ifndef WIN64
+  pthread_mutex_unlock(&mutex);
+#else
+  ReleaseMutex(mutex);
+#endif
 }
 
 void SegmentSearch::ImportFromProgress() {
+#ifndef WIN64
+  pthread_mutex_lock(&mutex);
+#else
+  WaitForSingleObject(mutex, INFINITE);
+#endif
+  
   if (currentProgress.segments.size() != segments.size()) {
+#ifndef WIN64
+    pthread_mutex_unlock(&mutex);
+#else
+    ReleaseMutex(mutex);
+#endif
     printf("[SegmentSearch] Предупреждение: количество сегментов не совпадает\n");
     return;
   }
+  
+  std::vector<std::string> segNames;
+  std::vector<uint64_t> keysChecked;
   
   for (size_t i = 0; i < segments.size() && i < currentProgress.segments.size(); i++) {
     const SegmentProgress &sp = currentProgress.segments[i];
@@ -515,8 +959,19 @@ void SegmentSearch::ImportFromProgress() {
     segments[i].currentKey.SetBase16((char *)sp.currentKey.c_str());
     segments[i].active = sp.active;
     
+    segNames.push_back(sp.name);
+    keysChecked.push_back(sp.keysChecked);
+  }
+  
+#ifndef WIN64
+  pthread_mutex_unlock(&mutex);
+#else
+  ReleaseMutex(mutex);
+#endif
+  
+  for (size_t i = 0; i < segNames.size(); i++) {
     printf("[SegmentSearch] Восстановлен сегмент %s: %llu ключей проверено\n",
-           sp.name.c_str(), (unsigned long long)sp.keysChecked);
+           segNames[i].c_str(), (unsigned long long)keysChecked[i]);
   }
 }
 
@@ -547,6 +1002,12 @@ bool SegmentSearch::PerformRebalance() {
     return false;
   }
   
+#ifndef WIN64
+  pthread_mutex_lock(&mutex);
+#else
+  WaitForSingleObject(mutex, INFINITE);
+#endif
+  
   // Обновить статус завершённых сегментов
   for (size_t i = 0; i < segments.size(); i++) {
     if (!segments[i].active) {
@@ -554,7 +1015,15 @@ bool SegmentSearch::PerformRebalance() {
     }
   }
   
-  return loadBalancer->Rebalance();
+  bool result = loadBalancer->Rebalance();
+  
+#ifndef WIN64
+  pthread_mutex_unlock(&mutex);
+#else
+  ReleaseMutex(mutex);
+#endif
+  
+  return result;
 }
 
 void SegmentSearch::SetSearchAlgorithm(SearchAlgorithm algorithm) {
