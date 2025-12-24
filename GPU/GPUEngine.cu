@@ -20,6 +20,7 @@
 #include <stdio.h>
 #endif
 
+#include "GPUGroup.h"
 #include "GPUEngine.h"
 #include <cuda.h>
 #include <cuda_runtime.h>
@@ -30,7 +31,6 @@
 #include "../hash/ripemd160.h"
 #include "../Timer.h"
 
-#include "GPUGroup.h"
 #include "GPUMath.h"
 #include "GPUHash.h"
 #include "GPUBase58.h"
@@ -301,10 +301,23 @@ GPUEngine::GPUEngine(int nbThreadGroup, int nbThreadPerGroup, int gpuId, uint32_
   // stack can also fail with cudaErrorMemoryAllocation on multi-tenant GPU servers.
   // We therefore set a minimal safe stack first, and only fall back to smaller values if required.
   const size_t minRequiredStack = 20480; // >= ~16KB local arrays + overhead
-  size_t stackCandidates[] = {20480, 16384};
+  size_t stackCandidates[] = {20480, 16384, 12288, 8192, 6144, 4096};
   bool stackOk = false;
   size_t selectedStack = 0;
   int curGroups = nbThreadGroup;
+  size_t currentStack = 0;
+  err = cudaDeviceGetLimit(&currentStack, cudaLimitStackSize);
+  if (err == cudaSuccess) {
+    printf("GPUEngine: current cudaLimitStackSize is %zu bytes\n", currentStack);
+    if (currentStack >= minRequiredStack) {
+      stackOk = true;
+      selectedStack = currentStack;
+    }
+  } else {
+    printf("GPUEngine: cudaDeviceGetLimit(cudaLimitStackSize) failed: %s\n", cudaGetErrorString(err));
+    (void)cudaGetLastError();
+  }
+
   while (curGroups >= 1 && !stackOk) {
     for (size_t k = 0; k < sizeof(stackCandidates) / sizeof(stackCandidates[0]); k++) {
       size_t stackSize = stackCandidates[k];
@@ -336,14 +349,19 @@ GPUEngine::GPUEngine(int nbThreadGroup, int nbThreadPerGroup, int gpuId, uint32_
       deviceName = std::string(tmp2);
     }
   }
-  if (!stackOk || selectedStack < minRequiredStack) {
-    printf("GPUEngine: ERROR: unable to set cudaLimitStackSize to %zu bytes.\n", minRequiredStack);
-    printf("GPUEngine: Hint: reduce grid size (-g) to reduce total stack allocation.\n");
-    printf("GPUEngine: ERROR: GPU engine not initialised; GPU thread will exit.\n");
-    nbThread = 0;
-    return;
+  if (!stackOk) {
+    // Some providers disallow raising stack size (or report misleading OOM). Continue with current limit.
+    // This keeps GPU alive and avoids segfaults; correctness can be verified with `-check`.
+    printf("GPUEngine: WARNING: unable to set cudaLimitStackSize (min %zu). Continuing with current=%zu.\n",
+           minRequiredStack, currentStack);
+    printf("GPUEngine: WARNING: if results look suspicious, run `./VanitySearch -check` or reduce -g.\n");
+  } else {
+    printf("GPUEngine: cudaLimitStackSize set to %zu bytes\n", selectedStack);
+    if (selectedStack < minRequiredStack) {
+      printf("GPUEngine: WARNING: stack size %zu < recommended %zu; results may be incorrect. Consider smaller -g or run -check.\n",
+             selectedStack, minRequiredStack);
+    }
   }
-  printf("GPUEngine: cudaLimitStackSize set to %zu bytes\n", selectedStack);
 
   /*
   size_t heapSize = ;

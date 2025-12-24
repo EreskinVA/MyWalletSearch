@@ -27,8 +27,15 @@
 
 static const char *searchModes[] = {"Compressed","Uncompressed","Compressed or Uncompressed"};
 
-// Number of key per thread (must be a multiple of GRP_SIZE) per kernel call
-#define STEP_SIZE 64
+// Number of keys per thread per kernel call.
+// Must be a multiple of GRP_SIZE; otherwise GPU kernels do 0 iterations (STEP_SIZE/GRP_SIZE == 0).
+// In CUDA compilation units GRP_SIZE is provided by `GPUGroup.h`. In host compilation units we
+// fall back to 1024 (default generated group size).
+#ifdef GRP_SIZE
+#define STEP_SIZE GRP_SIZE
+#else
+#define STEP_SIZE 1024
+#endif
 
 // Number of thread per block
 #define ITEM_SIZE 28
