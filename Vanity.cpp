@@ -115,19 +115,13 @@ VanitySearch::VanitySearch(Secp256K1 *secp, vector<std::string> &inputPrefixes,s
   for(int i=0;i<65536;i++)
     prefixes.push_back(t);
 
-  // Check is inputPrefixes contains wildcard character
-  // ВАЖНО: Для простых префиксов добавляем '*' в конец, чтобы они обрабатывались как паттерны
-  // Это необходимо для корректной работы с GPU, так как GPU не использует таблицу префиксов
-  for (int i = 0; i < (int)inputPrefixes.size(); i++) {
-    bool hasWildcard = ((inputPrefixes[i].find('*') != std::string::npos) ||
-                        (inputPrefixes[i].find('?') != std::string::npos));
-    if (!hasWildcard) {
-      // Добавляем '*' в конец для обработки как паттерна
-      inputPrefixes[i] += "*";
-      hasPattern = true;
-    } else {
-      hasPattern = true;
-    }
+  // Check if inputPrefixes contains wildcard character.
+  // IMPORTANT: Do not auto-modify user prefixes (e.g. appending '*').
+  // Plain prefixes must stay on the fast prefix-table path; wildcard patterns stay on Wildcard path.
+  hasPattern = false;
+  for (int i = 0; i < (int)inputPrefixes.size() && !hasPattern; i++) {
+    hasPattern = ((inputPrefixes[i].find('*') != std::string::npos) ||
+                  (inputPrefixes[i].find('?') != std::string::npos));
   }
   
   // Парсим позиционные маски для всех паттернов
@@ -943,18 +937,11 @@ bool VanitySearch::checkPrivKey(string addr, Int &key, int32_t incr, int endomor
   Point sp = startPubKey;
 
   if (incr < 0) {
-    // Для отрицательного incr: k = key - |incr|
-    // Если результат отрицательный, добавляем order
-    Int absIncr((uint64_t)(-incr));
-    if (k.IsGreater(&absIncr)) {
-      k.Sub(&absIncr);
-    } else {
-      // k < absIncr, поэтому k - absIncr будет отрицательным
-      // Вычисляем: order - (absIncr - k)
-      absIncr.Sub(&k);
-      k.Set(&secp->order);
-      k.Sub(&absIncr);
-    }
+    // GPU reports symmetric points by negating Y and sending negative incr.
+    // The corresponding scalar is: k = -(key + |incr|) mod n  == n - (key + |incr|)
+    k.Add((uint64_t)(-incr));
+    k.Neg();
+    k.Add(&secp->order);
     if (startPubKeySpecified) sp.y.ModNeg();
   } else {
     k.Add((uint64_t)incr);
@@ -1998,13 +1985,10 @@ void VanitySearch::FindKeyGPU(TH_PARAM *ph) {
     for(int i=0;i<(int)found.size() && !endOfSearch;i++) {
 
       ITEM it = found[i];
-      // ВАЖНО: GPU использует startKey = keys[i] + groupSize/2
-      // incr от GPU - это смещение от startKey
-      // Поэтому нужно передать keys[i] + groupSize/2 как базовый ключ
-      Int gpuStartKey;
-      gpuStartKey.Set(&keys[it.thId]);
-      gpuStartKey.Add((uint64_t)(g.GetGroupSize() / 2));
-      checkAddr(*(prefix_t *)(it.hash), it.hash, gpuStartKey, it.incr, it.endo, it.mode);
+      // IMPORTANT: `keys[it.thId]` is the base scalar k.
+      // Kernel internally starts from (k + GRP_SIZE/2)*G, but it reports `incr` such that
+      // the found scalar is k + incr (and symmetric uses negative incr).
+      checkAddr(*(prefix_t *)(it.hash), it.hash, keys[it.thId], it.incr, it.endo, it.mode);
 
     }
 
