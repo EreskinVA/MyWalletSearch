@@ -32,8 +32,10 @@ OBJET += $(OBJDIR)/GPU/GPUEngine.o
 endif
 
 CXX        = g++
-CUDA       = /usr/local/cuda-8.0
-CXXCUDA    = /usr/bin/g++-4.8
+# CUDA toolkit root (server uses /usr/local/cuda -> /usr/local/cuda-13.0)
+CUDA       ?= /usr/local/cuda
+# Host C++ compiler used by nvcc
+CXXCUDA    ?= /usr/bin/g++
 NVCC       = $(CUDA)/bin/nvcc
 # nvcc requires joint notation w/o dot, i.e. "5.2" -> "52"
 ccap       = $(shell echo $(CCAP) | tr -d '.')
