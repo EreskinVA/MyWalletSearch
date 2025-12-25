@@ -7,7 +7,14 @@
 import sys
 import os
 import re
+import signal
 from datetime import datetime
+
+# Не печатать Traceback при использовании с пайпами (head/tail закрывают stdout рано)
+try:
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+except Exception:
+    pass
 
 def parse_hex_to_int(hex_str):
     """Конвертирует hex строку в int"""
@@ -253,5 +260,13 @@ def main():
     print()
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except BrokenPipeError:
+        # head/tail закрыли пайп — это нормально
+        try:
+            sys.stdout.close()
+        except Exception:
+            pass
+        sys.exit(0)
 
