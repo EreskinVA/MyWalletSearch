@@ -5,7 +5,9 @@
 Требования пользователя:
 - одно поле "базовое имя" для файлов, а реальные имена получаются добавлением суффиксов
 - многострочное поле для сегментов (содержимое seg-файла)
-- поля для паттерна (префикс/суффикс -> prefix*suffix)
+- удобный ввод паттернов:
+  - быстрый вариант: prefix (+ опционально suffix -> prefix*suffix)
+  - расширенный вариант: несколько паттернов (по одному на строку) => запуск через `-i patterns.txt`
 - поле "сколько строк лога показывать" + большое окно вывода
 - кнопки: Stop (убить процессы), Start (запуск поиска), Rebuild (пересборка под текущий ПК/GPU)
 - просмотр tail -n N логов и прогресса через show_segment_progress.py
@@ -37,6 +39,43 @@ class DerivedFiles:
     progress_file: Path
     out_file: Path
     log_file: Path
+    patterns_file: Path
+
+
+def _normalize_pattern_line(line: str) -> str:
+    """
+    Нормализует строку паттерна:
+    - обрезает пробелы
+    - игнорирует пустые строки и комментарии (#...)
+    - снимает внешние кавычки "..." или '...' (частая ошибка при копипасте из команд)
+    """
+    s = (line or "").strip()
+    if not s:
+        return ""
+    if s.startswith("#"):
+        return ""
+    if len(s) >= 2 and s[0] == s[-1] and s[0] in ("'", '"'):
+        s = s[1:-1].strip()
+    return s
+
+
+def _format_cmd_for_display(args: list[str]) -> str:
+    """
+    Форматирует команду для вывода в лог так, чтобы её можно было копипастить в shell.
+    Важно: GUI запускает процесс через subprocess(args, shell=False), поэтому кавычки для запуска НЕ нужны,
+    но для копипаста в PowerShell/cmd они полезны при наличии *, ?, пробелов.
+    """
+    def q(a: str) -> str:
+        if a is None:
+            return ""
+        need = (" " in a) or ("\t" in a) or ("*" in a) or ("?" in a)
+        if not need:
+            return a
+        # простая защита: экранируем двойные кавычки
+        a2 = a.replace('"', r'\"')
+        return f"\"{a2}\""
+
+    return " ".join(q(a) for a in args)
 
 
 def _safe_decode(b: bytes) -> str:
@@ -284,9 +323,17 @@ class VanityGUI:
         top = ttk.Frame(self.root)
         top.pack(fill=X, padx=10, pady=8)
 
+        # buttons (moved to top as requested)
+        btn_row = ttk.Frame(top)
+        btn_row.pack(fill=X)
+        ttk.Button(btn_row, text="STOP: убить все VanitySearch процессы", command=self.kill_all).pack(side=LEFT)
+        ttk.Button(btn_row, text="START: запуск поиска", command=self.start_search).pack(side=LEFT, padx=10)
+        ttk.Button(btn_row, text="REBUILD: пересобрать под этот ПК", command=self.rebuild).pack(side=LEFT)
+        ttk.Button(btn_row, text="Очистить вывод", command=self.clear_output).pack(side=RIGHT)
+
         # row 1: base name + derived
         row1 = ttk.Frame(top)
-        row1.pack(fill=X)
+        row1.pack(fill=X, pady=(8, 0))
         ttk.Label(row1, text="Базовое имя файлов:").pack(side=LEFT)
         e_base = ttk.Entry(row1, textvariable=self.base_name, width=28)
         e_base.pack(side=LEFT, padx=6)
@@ -311,6 +358,18 @@ class VanityGUI:
         e_bits.pack(side=LEFT, padx=6)
         attach_context_menu(e_bits, allow_edit=True)
         ttk.Checkbutton(row2, text="auto-resume если progress есть", variable=self.auto_resume).pack(side=LEFT, padx=8)
+
+        # row 2b: multi-patterns (-i)
+        row2b = ttk.Frame(top)
+        row2b.pack(fill=X, pady=(6, 0))
+        ttk.Label(row2b, text="Паттерны (-i, по одному в строке; пустые/#+комментарии игнорируются):").pack(side=LEFT)
+
+        # patterns text (compact)
+        pat_frame = ttk.Frame(top)
+        pat_frame.pack(fill=X, pady=(4, 0))
+        self.patterns_text = Text(pat_frame, height=4, wrap="none")
+        self.patterns_text.pack(fill=X, expand=False, padx=0, pady=0)
+        attach_context_menu(self.patterns_text, allow_edit=True)
 
         # row 3: gpu/grid/threads/maxfound/autosave/tail
         row3 = ttk.Frame(top)
@@ -370,15 +429,6 @@ class VanityGUI:
         # read-only, но можно выделять/копировать
         attach_context_menu(self.output, allow_edit=False)
 
-        # buttons
-        bottom = ttk.Frame(self.root)
-        bottom.pack(fill=X, padx=10, pady=(0, 10))
-
-        ttk.Button(bottom, text="STOP: убить все VanitySearch процессы", command=self.kill_all).pack(side=LEFT)
-        ttk.Button(bottom, text="START: запуск поиска", command=self.start_search).pack(side=LEFT, padx=10)
-        ttk.Button(bottom, text="REBUILD: пересобрать под этот ПК", command=self.rebuild).pack(side=LEFT)
-        ttk.Button(bottom, text="Очистить вывод", command=self.clear_output).pack(side=RIGHT)
-
     # ---------- Helpers ----------
     def log(self, s: str) -> None:
         try:
@@ -423,11 +473,12 @@ class VanityGUI:
         return DerivedFiles(
             workdir=workdir,
             # Именование совместимо с *.sh и show_segment_progress.py:
-            #   seg_<base>.txt, progress_<base>.dat, out_<base>.txt, log_<base>.log
+            #   seg_<base>.txt, progress_<base>.dat, out_<base>.txt, log_<base>.log, patterns_<base>.txt
             seg_file=workdir / f"seg_{base}.txt",
             progress_file=workdir / f"progress_{base}.dat",
             out_file=workdir / f"out_{base}.txt",
             log_file=workdir / f"log_{base}.log",
+            patterns_file=workdir / f"patterns_{base}.txt",
         )
 
     def current_pattern(self) -> str:
@@ -441,6 +492,38 @@ class VanityGUI:
         if s:
             return f"{p}*{s}"
         return p
+
+    def patterns_from_textbox(self) -> list[str]:
+        if not hasattr(self, "patterns_text") or self.patterns_text is None:
+            return []
+        raw = self.patterns_text.get("1.0", END).splitlines()
+        out: list[str] = []
+        for line in raw:
+            p = _normalize_pattern_line(line)
+            if p:
+                out.append(p)
+        return out
+
+    def collect_patterns(self) -> list[str]:
+        """
+        Собирает список паттернов из:
+        - быстрого поля prefix/suffix
+        - многострочного списка паттернов
+        Пустые значения игнорируются.
+        """
+        patterns: list[str] = []
+        p0 = self.current_pattern()
+        if p0:
+            patterns.append(_normalize_pattern_line(p0) or p0)
+        patterns.extend(self.patterns_from_textbox())
+        # дедуп по порядку (чтобы случайно не искать одно и то же дважды)
+        seen = set()
+        uniq: list[str] = []
+        for p in patterns:
+            if p not in seen:
+                seen.add(p)
+                uniq.append(p)
+        return uniq
 
     def _init_defaults(self) -> None:
         cc = detect_compute_cap()
@@ -458,6 +541,9 @@ class VanityGUI:
                 "abs 1000 0 down seg2 1\n"
             )
             self.segments_text.insert("1.0", sample)
+        # подставим пример паттернов (как в RUNBOOK 4.1.1), если поле пустое
+        if hasattr(self, "patterns_text") and not self.patterns_text.get("1.0", END).strip():
+            self.patterns_text.insert("1.0", "# Примеры (по одному в строке, без кавычек):\n# 18ss\n# 1P*X\n")
 
     # ---------- Actions ----------
     def kill_all(self) -> None:
@@ -505,9 +591,9 @@ class VanityGUI:
             self.log("VanitySearch.exe не найден. Нажмите REBUILD.\n")
             return
 
-        pattern = self.current_pattern()
-        if not pattern:
-            self.log("Паттерн пустой — заполните prefix (и опционально suffix).\n")
+        patterns = self.collect_patterns()
+        if not patterns:
+            self.log("Паттерны не заданы — заполните prefix (и опционально suffix) и/или добавьте строки в поле 'Паттерны (-i)'.\n")
             return
 
         grid = self.grid.get().strip() or default_grid_for_current_gpu(exe)
@@ -521,6 +607,15 @@ class VanityGUI:
         if self.auto_resume.get() and df.progress_file.exists():
             resume_flag = ["-resume"]
 
+        # Если паттерн один — передаём как последний аргумент.
+        # Если паттернов несколько — пишем patterns_<base>.txt и запускаем через -i (см. RUNBOOK 4.1.1).
+        pattern_args: list[str] = []
+        if len(patterns) == 1:
+            pattern_args = [patterns[0]]
+        else:
+            df.patterns_file.write_text("\n".join(patterns) + "\n", encoding="utf-8")
+            pattern_args = ["-i", str(df.patterns_file)]
+
         args = [
             str(exe),
             "-seg", str(df.seg_file),
@@ -533,12 +628,14 @@ class VanityGUI:
             "-autosave", str(autosave),
             "-o", str(df.out_file),
             *resume_flag,
-            pattern,
+            *pattern_args,
         ]
 
         self.log(f"[START] cwd={exe.parent}\n")
         self.log(f"[START] seg={df.seg_file.name} progress={df.progress_file.name} out={df.out_file.name} log={df.log_file.name}\n")
-        self.log(f"[START] cmd: {' '.join(args)}\n")
+        if len(patterns) > 1:
+            self.log(f"[START] patterns: {len(patterns)} (через -i {df.patterns_file.name})\n")
+        self.log(f"[START] cmd: {_format_cmd_for_display(args)}\n")
 
         # запускаем в фоне, stdout/stderr -> log
         df.log_file.parent.mkdir(parents=True, exist_ok=True)
