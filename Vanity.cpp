@@ -77,10 +77,11 @@ VanitySearch::VanitySearch(Secp256K1 *secp, vector<std::string> &inputPrefixes,s
   // Initialize segment search if requested
   if (useSegmentSearch) {
     segmentSearch = new SegmentSearch();
+    string targetAddr = inputPrefixes.empty() ? "" : inputPrefixes[0];
+    segmentSearch->SetTargetAddress(targetAddr);
     
     // Try to resume from progress file
     if (resumeProgress && !progressFile.empty()) {
-      string targetAddr = inputPrefixes.empty() ? "" : inputPrefixes[0];
       if (segmentSearch->LoadProgress(targetAddr)) {
         printf("[VanitySearch] Прогресс восстановлен, продолжаем поиск\n");
       } else {
@@ -107,6 +108,8 @@ VanitySearch::VanitySearch(Secp256K1 *secp, vector<std::string> &inputPrefixes,s
     // Enable progress saving if requested
     if (!progressFile.empty() && segmentSearch != NULL) {
       segmentSearch->EnableProgressSaving(progressFile, autoSaveInterval);
+      // Чтобы TargetAddress в progress-файле был заполнен (используется для валидации resume)
+      segmentSearch->SetTargetAddress(targetAddr);
     }
     
     // Set search algorithm
@@ -2069,7 +2072,7 @@ void VanitySearch::FindKeyGPU(TH_PARAM *ph) {
 #endif
       
       if (useSeg && segSearch != NULL) {
-        segSearch->UpdateProgress(thId, 6ULL * STEP_SIZE * nbThread);
+        segSearch->UpdateProgressGPU(thId * nbThread, nbThread, 6ULL * STEP_SIZE);
       }
     }
 

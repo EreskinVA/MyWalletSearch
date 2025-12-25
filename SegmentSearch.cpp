@@ -861,6 +861,25 @@ void SegmentSearch::EnableProgressSaving(const std::string &progressFile, int au
   printf("[SegmentSearch] Сохранение прогресса включено: %s\n", progressFile.c_str());
 }
 
+
+void SegmentSearch::SetTargetAddress(const std::string &targetAddress) {
+#ifndef WIN64
+  pthread_mutex_lock(&mutex);
+#else
+  WaitForSingleObject(mutex, INFINITE);
+#endif
+  progressTargetAddress = targetAddress;
+  // Если прогресс уже инициализирован — обновим поле, чтобы было видно в файле/валидации.
+  if (!currentProgress.segments.empty()) {
+    currentProgress.targetAddress = (!targetAddress.empty() ? targetAddress : progressTargetAddress);
+  }
+#ifndef WIN64
+  pthread_mutex_unlock(&mutex);
+#else
+  ReleaseMutex(mutex);
+#endif
+}
+
 bool SegmentSearch::SaveProgress(const std::string &targetAddress) {
   if (!progressSavingEnabled || progressManager == NULL) {
     return false;
@@ -874,11 +893,12 @@ bool SegmentSearch::SaveProgress(const std::string &targetAddress) {
   
   // Инициализация прогресса при первом сохранении
   if (currentProgress.segments.empty() && !segments.empty()) {
-    currentProgress = progressManager->CreateProgress(bitRange, targetAddress);
+    std::string effectiveTarget = (!targetAddress.empty() ? targetAddress : progressTargetAddress);
+    currentProgress = progressManager->CreateProgress(bitRange, effectiveTarget);
   }
   
   ExportToProgress();  // Уже защищен мьютексом внутри
-  currentProgress.targetAddress = targetAddress;
+  currentProgress.targetAddress = (!targetAddress.empty() ? targetAddress : progressTargetAddress);
   currentProgress.lastSaveTime = time(NULL);
   
   SearchProgress progressCopy = currentProgress;
@@ -1065,7 +1085,7 @@ void SegmentSearch::UpdateProgress(int threadId, uint64_t keysChecked) {
     
     // Автосохранение
     bool shouldSave = ShouldAutoSave();
-    std::string targetAddr = currentProgress.targetAddress;
+    std::string targetAddr = (!progressTargetAddress.empty() ? progressTargetAddress : currentProgress.targetAddress);
 #ifndef WIN64
     pthread_mutex_unlock(&mutex);
 #else
@@ -1081,6 +1101,120 @@ void SegmentSearch::UpdateProgress(int threadId, uint64_t keysChecked) {
 #else
     ReleaseMutex(mutex);
 #endif
+  }
+}
+
+
+void SegmentSearch::UpdateProgressGPU(int baseThreadId, int nbThread, uint64_t keysCheckedPerThread) {
+  if (!progressSavingEnabled) return;
+  if (nbThread <= 0) return;
+
+#ifndef WIN64
+  pthread_mutex_lock(&mutex);
+#else
+  WaitForSingleObject(mutex, INFINITE);
+#endif
+
+  if (segments.empty() || activeSegments <= 0) {
+#ifndef WIN64
+    pthread_mutex_unlock(&mutex);
+#else
+    ReleaseMutex(mutex);
+#endif
+    return;
+  }
+
+  // Один "шаг" по скаляру ≈ keysChecked/6 (point + endo1 + endo2 + sym + ...)
+  uint64_t scalarStepPerThread = keysCheckedPerThread / 6ULL;
+
+  // Считаем, сколько GPU-нитей попало в каждый сегмент
+  std::vector<uint32_t> segCounts(segments.size(), 0);
+
+  auto pickFallbackSeg = [&](int threadId) -> int {
+    // round-robin по активным сегментам
+    int activeSegCount = activeSegments;
+    if (activeSegCount <= 0) return 0;
+    int want = threadId % activeSegCount;
+    int activeCount = 0;
+    for (size_t i = 0; i < segments.size(); i++) {
+      if (!segments[i].active) continue;
+      if (activeCount == want) return (int)i;
+      activeCount++;
+    }
+    // fallback
+    for (size_t i = 0; i < segments.size(); i++) if (segments[i].active) return (int)i;
+    return 0;
+  };
+
+  for (int i = 0; i < nbThread; i++) {
+    int tid = baseThreadId + i;
+    int segIdx = -1;
+    auto it = threadSegmentMap.find(tid);
+    if (it != threadSegmentMap.end()) {
+      segIdx = it->second;
+      if (segIdx < 0 || segIdx >= (int)segments.size() || !segments[segIdx].active) {
+        segIdx = -1;
+      }
+    }
+    if (segIdx < 0) {
+      segIdx = pickFallbackSeg(tid);
+      threadSegmentMap[tid] = segIdx;
+    }
+    if (segIdx < 0) segIdx = 0;
+    segCounts[(size_t)segIdx]++;
+  }
+
+  // Обновляем сегменты агрегированно
+  for (size_t segIdx = 0; segIdx < segments.size(); segIdx++) {
+    uint32_t c = segCounts[segIdx];
+    if (c == 0) continue;
+    if (!segments[segIdx].active) continue;
+
+    uint64_t segKeysChecked = keysCheckedPerThread * (uint64_t)c;
+    keysCheckedSinceLastSave += segKeysChecked;
+
+    if (scalarStepPerThread > 0) {
+      uint64_t segScalarStep = scalarStepPerThread * (uint64_t)c;
+      if (segments[segIdx].direction == DIRECTION_UP) {
+        segments[segIdx].currentKey.Add(segScalarStep);
+        if (segments[segIdx].currentKey.IsGreater(&segments[segIdx].rangeEnd)) {
+          segments[segIdx].active = false;
+          activeSegments--;
+          printf("[SegmentSearch] Сегмент %s завершен (поиск вверх)\n", segments[segIdx].name.c_str());
+        }
+      } else {
+        segments[segIdx].currentKey.Sub(segScalarStep);
+        if (segments[segIdx].currentKey.IsLower(&segments[segIdx].rangeEnd)) {
+          segments[segIdx].active = false;
+          activeSegments--;
+          printf("[SegmentSearch] Сегмент %s завершен (поиск вниз)\n", segments[segIdx].name.c_str());
+        }
+      }
+    }
+
+    ProgressManager::UpdateSegmentProgress(currentProgress, (int)segIdx,
+                                          segments[segIdx].currentKey, segKeysChecked);
+  }
+
+  // Периодический вывод прогресса (каждые 1G ключей)
+  static uint64_t lastLogProgress = 0;
+  if (currentProgress.totalKeysChecked - lastLogProgress >= 1000000000ULL) {
+    printf("[ProgressManager] Всего ключей проверено: %llu (GPU batch, active=%d)\n",
+           (unsigned long long)currentProgress.totalKeysChecked, activeSegments);
+    lastLogProgress = currentProgress.totalKeysChecked;
+  }
+
+  bool shouldSave = ShouldAutoSave();
+  std::string targetAddr = (!progressTargetAddress.empty() ? progressTargetAddress : currentProgress.targetAddress);
+
+#ifndef WIN64
+  pthread_mutex_unlock(&mutex);
+#else
+  ReleaseMutex(mutex);
+#endif
+
+  if (shouldSave) {
+    SaveProgress(targetAddr);
   }
 }
 
@@ -1120,7 +1254,7 @@ void SegmentSearch::UpdateKangarooProgress(int segmentIndex, uint64_t totalJumps
     keysCheckedSinceLastSave += increment;
     
     std::string segName = segments[segmentIndex].name;
-    std::string targetAddr = currentProgress.targetAddress;
+    std::string targetAddr = (!progressTargetAddress.empty() ? progressTargetAddress : currentProgress.targetAddress);
     bool shouldSave = ShouldAutoSave();  // Уже защищен мьютексом внутри
     
 #ifndef WIN64

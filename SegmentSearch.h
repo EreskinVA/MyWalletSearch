@@ -91,9 +91,12 @@ public:
   
   // Управление прогрессом
   void EnableProgressSaving(const std::string &progressFile, int autoSaveInterval = 300);
+  void SetTargetAddress(const std::string &targetAddress);
   bool SaveProgress(const std::string &targetAddress);
   bool LoadProgress(const std::string &targetAddress);
   void UpdateProgress(int threadId, uint64_t keysChecked);
+  // GPU: обновить прогресс сразу для всех GPU-потоков (globalThreadId = baseThreadId + i)
+  void UpdateProgressGPU(int baseThreadId, int nbThread, uint64_t keysCheckedPerThread);
   void UpdateKangarooProgress(int segmentIndex, uint64_t totalJumps);
   bool ShouldAutoSave();
   
@@ -123,6 +126,7 @@ private:
   SearchProgress currentProgress;
   bool progressSavingEnabled;
   uint64_t keysCheckedSinceLastSave;
+  std::string progressTargetAddress;
   
   // Load balancing
   LoadBalancer *loadBalancer;
