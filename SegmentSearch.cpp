@@ -569,6 +569,9 @@ bool SegmentSearch::GetStartingKey(int threadId, Int &key) {
     return false;
   }
   
+  // Сохраняем соответствие threadId -> segIdx для UpdateProgress
+  threadSegmentMap[threadId] = segIdx;
+  
   key.Set(&seg.currentKey);
   
   // Добавляем небольшое смещение для потока, чтобы потоки не искали в одном месте.
@@ -982,7 +985,23 @@ void SegmentSearch::UpdateProgress(int threadId, uint64_t keysChecked) {
 #endif
   
   int segIdx = -1;
-  if (!segments.empty()) {
+  
+  // Сначала проверяем сохранённое соответствие threadId -> segIdx
+  auto it = threadSegmentMap.find(threadId);
+  if (it != threadSegmentMap.end()) {
+    segIdx = it->second;
+    // Проверяем что сегмент всё ещё активен
+    if (segIdx >= 0 && segIdx < (int)segments.size() && segments[segIdx].active) {
+      // Используем сохранённый сегмент
+    } else {
+      // Сегмент завершён, нужно найти новый
+      segIdx = -1;
+      threadSegmentMap.erase(it);
+    }
+  }
+  
+  // Если не нашли сохранённый сегмент, распределяем заново
+  if (segIdx < 0 && !segments.empty()) {
     // Использовать балансировщик, если включен
     if (loadBalancingEnabled && loadBalancer != NULL) {
       segIdx = loadBalancer->GetSegmentForThread(threadId);
@@ -1000,6 +1019,10 @@ void SegmentSearch::UpdateProgress(int threadId, uint64_t keysChecked) {
         }
       }
       if (segIdx < 0) segIdx = 0;
+    }
+    // Сохраняем новое соответствие
+    if (segIdx >= 0) {
+      threadSegmentMap[threadId] = segIdx;
     }
   }
   
@@ -1030,9 +1053,9 @@ void SegmentSearch::UpdateProgress(int threadId, uint64_t keysChecked) {
                                             segments[segIdx].currentKey, keysChecked);
     keysCheckedSinceLastSave += keysChecked;
     
-    // Периодический вывод прогресса (каждые 1M ключей)
+    // Периодический вывод прогресса (каждые 1G ключей, чтобы не засорять лог при высокой скорости)
     static uint64_t lastLogProgress = 0;
-    if (currentProgress.totalKeysChecked - lastLogProgress >= 1000000) {
+    if (currentProgress.totalKeysChecked - lastLogProgress >= 1000000000ULL) {
       printf("[ProgressManager] Всего ключей проверено: %llu (сегмент %d: %llu)\n",
              (unsigned long long)currentProgress.totalKeysChecked,
              segIdx,

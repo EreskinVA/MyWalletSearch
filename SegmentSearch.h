@@ -12,6 +12,7 @@
 #include "KangarooSearch.h"
 #include <vector>
 #include <string>
+#include <map>
 #ifndef WIN64
 #include <pthread.h>
 #else
@@ -137,6 +138,9 @@ private:
 #else
   mutable HANDLE mutex;
 #endif
+  
+  // Mapping threadId -> segmentIndex (для UpdateProgress чтобы использовать тот же сегмент)
+  std::map<int, int> threadSegmentMap;
   
   // Вычислить ключ для заданного процента
   void CalculateKeyAtPercent(double percent, Int &result);
