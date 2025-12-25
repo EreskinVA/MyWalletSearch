@@ -13,7 +13,7 @@
 
 ## Детальный просмотр по сегментам
 
-```bash
+```
 python3 show_segment_progress.py seg_gpu_range.txt progress_gpu_range.dat
 ```
 
