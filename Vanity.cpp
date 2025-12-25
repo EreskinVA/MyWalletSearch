@@ -848,10 +848,12 @@ string VanitySearch::GetExpectedTime(double keyRate,double keyCount) {
 
 void VanitySearch::output(string addr,string pAddr,string pAddrHex) {
   // Backward-compatible wrapper
-  output(addr, pAddr, pAddrHex, "", "", "");
+  output(addr, pAddr, pAddrHex, "", "", "", "");
 }
 
-void VanitySearch::output(string addr,string pAddr,string pAddrHex, string segKeyHex, string segKeyDec, string segPosInfo) {
+void VanitySearch::output(string addr,string pAddr,string pAddrHex,
+                          string segKeyHex, string segKeyDec,
+                          string puzzleInfo, string segExtraInfo) {
 
 #ifdef WIN64
    WaitForSingleObject(ghMutex,INFINITE);
@@ -901,14 +903,19 @@ void VanitySearch::output(string addr,string pAddr,string pAddrHex, string segKe
       k.SetBase16((char *)pAddrHex.c_str());
       fprintf(f, "Priv (DEC): %s\n", k.GetBase10().c_str());
     }
-    // Для сегментного поиска: "сырой" ключ в пределах заданного ABS/percent диапазона
+    // Для удобства чтения: сначала информация о позиции в PUZZLE (PuzzleKeyAbs/PuzzlePos0),
+    // затем уже сегментная "механика" (SegKey/Segment/Offset/Size...).
+    if (!puzzleInfo.empty()) {
+      fprintf(f, "%s", puzzleInfo.c_str());
+    }
+
     if (!segKeyHex.empty() && !segKeyDec.empty()) {
       fprintf(f, "SegKey (HEX): 0x%s\n", segKeyHex.c_str());
       fprintf(f, "SegKey (DEC): %s\n", segKeyDec.c_str());
     }
-    if (!segPosInfo.empty()) {
-      // segPosInfo уже должен содержать \n в конце строк
-      fprintf(f, "%s", segPosInfo.c_str());
+
+    if (!segExtraInfo.empty()) {
+      fprintf(f, "%s", segExtraInfo.c_str());
     }
 
   }
@@ -1068,7 +1075,8 @@ bool VanitySearch::checkPrivKey(string addr, Int &key, int32_t incr, int endomor
     segKey.Add(ai);
   }
 
-  std::string segPosInfo;
+  std::string puzzleInfo;
+  std::string segExtraInfo;
   if (useSegmentSearch && segmentSearch != NULL) {
     SearchSegment seg;
     int segIdx = -1;
@@ -1088,10 +1096,10 @@ bool VanitySearch::checkPrivKey(string addr, Int &key, int32_t incr, int endomor
       rangeSize.Sub(&seg.rangeStart);
       rangeSize.Abs();
 
-      segPosInfo += "Segment: " + seg.name + " (#" + std::to_string(segIdx + 1) + ")\n";
-      segPosInfo += std::string("SegmentDir: ") + (seg.direction == DIRECTION_UP ? "UP" : "DOWN") + "\n";
-      segPosInfo += "SegmentOffset (DEC): " + offset.GetBase10() + "\n";
-      segPosInfo += "SegmentSize (DEC): " + rangeSize.GetBase10() + "\n";
+      segExtraInfo += "Segment: " + seg.name + " (#" + std::to_string(segIdx + 1) + ")\n";
+      segExtraInfo += std::string("SegmentDir: ") + (seg.direction == DIRECTION_UP ? "UP" : "DOWN") + "\n";
+      segExtraInfo += "SegmentOffset (DEC): " + offset.GetBase10() + "\n";
+      segExtraInfo += "SegmentSize (DEC): " + rangeSize.GetBase10() + "\n";
     }
   }
 
@@ -1105,13 +1113,22 @@ bool VanitySearch::checkPrivKey(string addr, Int &key, int32_t incr, int endomor
     Int puzzlePos0(&segKey);
     if (puzzlePos0.IsGreaterOrEqual(&puzzleStart)) {
       puzzlePos0.Sub(&puzzleStart); // 0-based
-      segPosInfo += "PuzzleBits: " + std::to_string(segmentBitRange) + "\n";
-      segPosInfo += "PuzzleStart (DEC): " + puzzleStart.GetBase10() + "\n";
-      segPosInfo += "PuzzlePos0 (DEC): " + puzzlePos0.GetBase10() + "\n";
+      puzzleInfo += "PuzzleBits: " + std::to_string(segmentBitRange) + "\n";
+      puzzleInfo += "PuzzleStart (DEC): " + puzzleStart.GetBase10() + "\n";
+      puzzleInfo += "PuzzlePos0 (DEC): " + puzzlePos0.GetBase10() + "\n";
+
+      // Явное восстановление абсолютного ключа из позиции (для сравнения с ABS-сегментами):
+      // PuzzleKeyAbs = PuzzleStart + PuzzlePos0
+      Int puzzleKeyAbs(&puzzleStart);
+      puzzleKeyAbs.Add(&puzzlePos0);
+      puzzleInfo += "PuzzleKeyAbs (HEX): 0x" + puzzleKeyAbs.GetBase16() + "\n";
+      puzzleInfo += "PuzzleKeyAbs (DEC): " + puzzleKeyAbs.GetBase10() + "\n";
     }
   }
 
-  output(addr, secp->GetPrivAddress(mode ,k), k.GetBase16(), segKey.GetBase16(), segKey.GetBase10(), segPosInfo);
+  output(addr, secp->GetPrivAddress(mode ,k), k.GetBase16(),
+         segKey.GetBase16(), segKey.GetBase10(),
+         puzzleInfo, segExtraInfo);
 
   return true;
 

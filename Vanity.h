@@ -110,7 +110,7 @@ private:
   void output(std::string addr, std::string pAddr, std::string pAddrHex);
   // Доп. информация для SegmentSearch: "сырой" скаляр внутри заданного сегмента (до endo/sym преобразований)
   void output(std::string addr, std::string pAddr, std::string pAddrHex,
-              std::string segKeyHex, std::string segKeyDec, std::string segPosInfo);
+              std::string segKeyHex, std::string segKeyDec, std::string puzzleInfo, std::string segExtraInfo);
   bool isAlive(TH_PARAM *p);
   bool isSingularPrefix(std::string pref);
   bool hasStarted(TH_PARAM *p);
