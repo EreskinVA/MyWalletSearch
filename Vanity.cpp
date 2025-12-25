@@ -73,6 +73,7 @@ VanitySearch::VanitySearch(Secp256K1 *secp, vector<std::string> &inputPrefixes,s
   this->startPubKeySpecified = !startPubKey.isZero();
   this->useSegmentSearch = useSegments;
   this->segmentSearch = NULL;
+  this->segmentBitRange = bitRange;
 
   // Initialize segment search if requested
   if (useSegmentSearch) {
@@ -846,6 +847,11 @@ string VanitySearch::GetExpectedTime(double keyRate,double keyCount) {
 // ----------------------------------------------------------------------------
 
 void VanitySearch::output(string addr,string pAddr,string pAddrHex) {
+  // Backward-compatible wrapper
+  output(addr, pAddr, pAddrHex, "", "", "");
+}
+
+void VanitySearch::output(string addr,string pAddr,string pAddrHex, string segKeyHex, string segKeyDec, string segPosInfo) {
 
 #ifdef WIN64
    WaitForSingleObject(ghMutex,INFINITE);
@@ -894,6 +900,15 @@ void VanitySearch::output(string addr,string pAddr,string pAddrHex) {
       Int k;
       k.SetBase16((char *)pAddrHex.c_str());
       fprintf(f, "Priv (DEC): %s\n", k.GetBase10().c_str());
+    }
+    // Для сегментного поиска: "сырой" ключ в пределах заданного ABS/percent диапазона
+    if (!segKeyHex.empty() && !segKeyDec.empty()) {
+      fprintf(f, "SegKey (HEX): 0x%s\n", segKeyHex.c_str());
+      fprintf(f, "SegKey (DEC): %s\n", segKeyDec.c_str());
+    }
+    if (!segPosInfo.empty()) {
+      // segPosInfo уже должен содержать \n в конце строк
+      fprintf(f, "%s", segPosInfo.c_str());
     }
 
   }
@@ -1046,7 +1061,57 @@ bool VanitySearch::checkPrivKey(string addr, Int &key, int32_t incr, int endomor
 
   }
 
-  output(addr, secp->GetPrivAddress(mode ,k), k.GetBase16());
+  // segKey: скаляр внутри заданного диапазона до endo/sym (для понимания позиции в SegmentSearch)
+  Int segKey(&baseKey);
+  {
+    uint64_t ai = (incr < 0) ? (uint64_t)(-(int64_t)incr) : (uint64_t)incr;
+    segKey.Add(ai);
+  }
+
+  std::string segPosInfo;
+  if (useSegmentSearch && segmentSearch != NULL) {
+    SearchSegment seg;
+    int segIdx = -1;
+    if (segmentSearch->GetSegmentForKey(segKey, segIdx, seg)) {
+      // Точная позиция внутри сегмента:
+      // offset = (segKey - rangeStart) для UP, либо (rangeStart - segKey) для DOWN.
+      Int offset;
+      if (seg.direction == DIRECTION_UP) {
+        offset.Set(&segKey);
+        offset.Sub(&seg.rangeStart);
+      } else {
+        offset.Set(&seg.rangeStart);
+        offset.Sub(&segKey);
+      }
+      Int rangeSize;
+      rangeSize.Set(&seg.rangeEnd);
+      rangeSize.Sub(&seg.rangeStart);
+      rangeSize.Abs();
+
+      segPosInfo += "Segment: " + seg.name + " (#" + std::to_string(segIdx + 1) + ")\n";
+      segPosInfo += std::string("SegmentDir: ") + (seg.direction == DIRECTION_UP ? "UP" : "DOWN") + "\n";
+      segPosInfo += "SegmentOffset (DEC): " + offset.GetBase10() + "\n";
+      segPosInfo += "SegmentSize (DEC): " + rangeSize.GetBase10() + "\n";
+    }
+  }
+
+  // Точная позиция в PUZZLE-диапазоне bits=N: [2^(N-1) .. 2^N - 1]
+  // Печатаем позицию для segKey (ключа, который реально перебирался в сегментах).
+  if (segmentBitRange > 0) {
+    Int puzzleStart;
+    puzzleStart.SetInt32(1);
+    puzzleStart.ShiftL((uint32_t)(segmentBitRange - 1));
+
+    Int puzzlePos0(&segKey);
+    if (puzzlePos0.IsGreaterOrEqual(&puzzleStart)) {
+      puzzlePos0.Sub(&puzzleStart); // 0-based
+      segPosInfo += "PuzzleBits: " + std::to_string(segmentBitRange) + "\n";
+      segPosInfo += "PuzzleStart (DEC): " + puzzleStart.GetBase10() + "\n";
+      segPosInfo += "PuzzlePos0 (DEC): " + puzzlePos0.GetBase10() + "\n";
+    }
+  }
+
+  output(addr, secp->GetPrivAddress(mode ,k), k.GetBase16(), segKey.GetBase16(), segKey.GetBase10(), segPosInfo);
 
   return true;
 

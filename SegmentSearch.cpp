@@ -62,6 +62,46 @@ SegmentSearch::~SegmentSearch() {
 #endif
 }
 
+bool SegmentSearch::GetSegmentForKey(const Int &key, int &segmentIndex, SearchSegment &segmentOut) const {
+  segmentIndex = -1;
+
+#ifndef WIN64
+  pthread_mutex_lock(&mutex);
+#else
+  WaitForSingleObject(mutex, INFINITE);
+#endif
+
+  // direction может быть UP/DOWN, но принадлежность ключа сегменту определяется попаданием
+  // в [min(rangeStart, rangeEnd), max(rangeStart, rangeEnd)].
+  for (int i = 0; i < (int)segments.size(); i++) {
+    const SearchSegment &s = segments[i];
+    if (!s.active) continue;
+
+    Int k(&key);
+    Int a(&s.rangeStart);
+    Int b(&s.rangeEnd);
+
+    Int mn(&a);
+    Int mx(&a);
+    if (b.IsLower(&mn)) mn.Set(&b);
+    if (b.IsGreater(&mx)) mx.Set(&b);
+
+    if (k.IsGreaterOrEqual(&mn) && k.IsLowerOrEqual(&mx)) {
+      segmentIndex = i;
+      segmentOut = s; // копия
+      break;
+    }
+  }
+
+#ifndef WIN64
+  pthread_mutex_unlock(&mutex);
+#else
+  ReleaseMutex(mutex);
+#endif
+
+  return segmentIndex >= 0;
+}
+
 void SegmentSearch::AddSegment(double startPercent, double endPercent,
                                 SearchDirection direction, const std::string &name, int priority) {
 #ifndef WIN64

@@ -108,6 +108,9 @@ private:
   void checkAddresses(bool compressed, Int key, int i, Point p1);
   void checkAddressesSSE(bool compressed, Int key, int i, Point p1, Point p2, Point p3, Point p4);
   void output(std::string addr, std::string pAddr, std::string pAddrHex);
+  // Доп. информация для SegmentSearch: "сырой" скаляр внутри заданного сегмента (до endo/sym преобразований)
+  void output(std::string addr, std::string pAddr, std::string pAddrHex,
+              std::string segKeyHex, std::string segKeyDec, std::string segPosInfo);
   bool isAlive(TH_PARAM *p);
   bool isSingularPrefix(std::string pref);
   bool hasStarted(TH_PARAM *p);
@@ -170,6 +173,7 @@ private:
   // Segment search support
   bool useSegmentSearch;
   SegmentSearch *segmentSearch;
+  int segmentBitRange;
 
 #ifdef WIN64
   HANDLE ghMutex;

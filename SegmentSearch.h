@@ -108,6 +108,10 @@ public:
   // Выбор алгоритма поиска
   void SetSearchAlgorithm(SearchAlgorithm algorithm);
   SearchAlgorithm GetSearchAlgorithm() const { return searchAlgorithm; }
+
+  // Найти сегмент, которому принадлежит заданный ключ (по rangeStart/rangeEnd).
+  // Возвращает индекс (0-based) и копию сегмента.
+  bool GetSegmentForKey(const Int &key, int &segmentIndex, SearchSegment &segmentOut) const;
   
   // Kangaroo search для сегмента
   bool SearchSegmentWithKangaroo(int segmentIndex, Secp256K1 *secp, 
