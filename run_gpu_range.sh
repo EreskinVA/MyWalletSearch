@@ -7,6 +7,7 @@ set -euo pipefail
 SEG_FILE="seg_gpu_range.txt"
 OUT_FILE="out_gpu_range.txt"
 LOG_FILE="log_gpu_range.log"
+PROGRESS_FILE="progress_gpu_range.dat"
 
 # Параметры GPU (рекомендованные для RTX4090 из предыдущих тестов)
 GPU_ID="${GPU_ID:-0}"
@@ -15,19 +16,22 @@ CPU_THREADS="${CPU_THREADS:-2}"
 MAXFOUND="${MAXFOUND:-1000000}"
 BITS="${BITS:-71}"
 PATTERN="${PATTERN:-1PWo3JeB9jr}"
+AUTOSAVE_INTERVAL="${AUTOSAVE_INTERVAL:-120}"  # 2 минуты по умолчанию
 
 echo "=== GPU range run ==="
 echo "SEG_FILE=$SEG_FILE"
 echo "OUT_FILE=$OUT_FILE"
 echo "LOG_FILE=$LOG_FILE"
+echo "PROGRESS_FILE=$PROGRESS_FILE"
 echo "GPU_ID=$GPU_ID GRID=$GRID CPU_THREADS=$CPU_THREADS MAXFOUND=$MAXFOUND BITS=$BITS"
 echo "PATTERN=$PATTERN"
+echo "AUTOSAVE_INTERVAL=$AUTOSAVE_INTERVAL сек"
 
 # Подготовка файлов
 : > "$OUT_FILE"
 : > "$LOG_FILE"
 
-nohup bash -c "./VanitySearch -seg \"$SEG_FILE\" -bits \"$BITS\" -gpu -gpuId \"$GPU_ID\" -g \"$GRID\" -t \"$CPU_THREADS\" -m \"$MAXFOUND\" -o \"$OUT_FILE\" \"$PATTERN\" > \"$LOG_FILE\" 2>&1" &
+nohup bash -c "./VanitySearch -seg \"$SEG_FILE\" -bits \"$BITS\" -gpu -gpuId \"$GPU_ID\" -g \"$GRID\" -t \"$CPU_THREADS\" -m \"$MAXFOUND\" -progress \"$PROGRESS_FILE\" -autosave \"$AUTOSAVE_INTERVAL\" -o \"$OUT_FILE\" \"$PATTERN\" > \"$LOG_FILE\" 2>&1" &
 
 PID=$!
 echo "Запущено. PID=$PID"
