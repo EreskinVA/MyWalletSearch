@@ -14,7 +14,7 @@ GRID="${GRID:-64,128}"
 CPU_THREADS="${CPU_THREADS:-2}"
 MAXFOUND="${MAXFOUND:-1000000}"
 BITS="${BITS:-71}"
-PATTERN="${PATTERN:-1PWo}"  # Стандартный префикс для puzzle 71
+PATTERN="${PATTERN:-1PWo3JeB}"  # Префикс для puzzle 71
 AUTOSAVE_INTERVAL="${AUTOSAVE_INTERVAL:-120}"  # 2 минуты
 
 echo "=== GPU запуск: Puzzle 71, 69-72% диапазон ==="
