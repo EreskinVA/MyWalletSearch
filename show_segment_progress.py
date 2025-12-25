@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Детальный просмотр прогресса по сегментам
 Читает seg-файл для границ и progress-файл для текущих позиций
@@ -9,6 +10,33 @@ import os
 import re
 import signal
 from datetime import datetime
+
+# Настройка кодировки для корректного вывода русского текста в Windows
+if sys.platform == 'win32':
+    try:
+        # Переключаем консоль на UTF-8 (кодовая страница 65001)
+        os.system('chcp 65001 >nul 2>&1')
+    except Exception:
+        pass
+    
+    try:
+        # Пытаемся использовать UTF-8
+        if hasattr(sys.stdout, 'reconfigure'):
+            sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        else:
+            # Для старых версий Python
+            import io
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    except Exception:
+        # Если не получилось, пробуем cp866 (DOS кодировка для русских символов)
+        try:
+            if hasattr(sys.stdout, 'reconfigure'):
+                sys.stdout.reconfigure(encoding='cp866', errors='replace')
+            else:
+                import io
+                sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='cp866', errors='replace')
+        except Exception:
+            pass
 
 # Не печатать Traceback при использовании с пайпами (head/tail закрывают stdout рано)
 try:
@@ -254,9 +282,9 @@ def main():
         sys.exit(1)
     
     # Заголовок
-    print("=" * 100)
+    print("=" * 120)
     print(f"Прогресс поиска")
-    print("=" * 100)
+    print("=" * 120)
     print(f"Файл конфигурации: {seg_file}")
     print(f"Файл прогресса:    {progress_file}")
     print(f"Битовый диапазон:  {progress['bitRange']}")
@@ -275,12 +303,12 @@ def main():
         print(f"Начало поиска:     {format_time(progress['startTime'])}")
     if progress['lastSaveTime'] > 0:
         print(f"Последнее сохранение: {format_time(progress['lastSaveTime'])}")
-    print("=" * 100)
+    print("=" * 120)
     print()
     
     # Заголовок таблицы
-    print(f"{'Сегмент':<12} {'Статус':<8} {'Прогресс %':<12} {'Проверено':<15} {'Осталось':<15} {'Размер':<15} {'Ключей':<15}")
-    print("-" * 100)
+    print(f"{'Сегмент':<18} {'Статус':<6} {'Прогресс %':<12} {'Проверено':<18} {'Осталось':<18} {'Размер':<18} {'Ключей':<18}")
+    print("-" * 120)
     
     # Прогресс по сегментам
     total_checked = 0
@@ -302,7 +330,10 @@ def main():
         # Вычисляем прогресс
         percent, progress_val, remaining, seg_size = calculate_segment_progress(seg_config, seg_progress)
         
-        status = "✓ Завершен" if not active else "▶ Активен"
+        # Важно: на Windows при выводе в pipe/Powershell кодировка часто cp1251,
+        # и некоторые Unicode символы (например '▶') не кодируются => UnicodeEncodeError.
+        # Поэтому используем только ASCII.
+        status = "DONE" if not active else "RUN"
         
         if percent is not None:
             progress_str = f"{percent:.2f}%"
@@ -317,9 +348,9 @@ def main():
         
         keys_str = format_number(keys_checked)
         
-        print(f"{name:<12} {status:<8} {progress_str:<12} {progress_num_str:<15} {remaining_str:<15} {size_str:<15} {keys_str:<15}")
+        print(f"{name:<18} {status:<6} {progress_str:>12} {progress_num_str:>18} {remaining_str:>18} {size_str:>18} {keys_str:>18}")
     
-    print("-" * 100)
+    print("-" * 120)
     print(f"Всего сегментов: {len(progress['segments'])} | Активных: {active_count} | Завершено: {completed_count}")
     print(f"Всего проверено ключей (сумма по сегментам): {format_number(total_checked)}")
     print()

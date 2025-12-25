@@ -119,7 +119,7 @@ Set-Location "C:\path\to\MyWalletSearch\x64\ReleaseSM61"
   -seg .\seg_matrix_test.txt -bits 24 `
   -gpu -gpuId 0 -g 48,128 -t 2 -m 200000 `
   -stop -o out_seg_prefix_suffix.txt `
-  "1*1"  *> seg_test.log
+  "1уц*"  *> seg_test.log
 ```
 
 - Результаты (адреса/ключи) будут в `out_seg_prefix_suffix.txt`
@@ -132,6 +132,29 @@ Set-Location "C:\path\to\MyWalletSearch\x64\ReleaseSM61"
 ```powershell
 Get-Process VanitySearch -ErrorAction SilentlyContinue | Stop-Process -Force
 ```
+
+### 0.10 (Опционально) GUI-лаунчер для Windows
+
+В репозитории есть мини-приложение `vanity_gui.py` (tkinter, без зависимостей), которое умеет:
+- генерировать seg-файл из многострочного поля
+- запускать `VanitySearch.exe` с `-progress/-autosave` (и `-resume`, если progress уже существует)
+- писать лог/прогресс/найденные в файлы с суффиксами от одного базового имени
+- показывать tail последних N строк лога и вывод `show_segment_progress.py`
+- останавливать все процессы `VanitySearch.exe`
+- пересобирать `VanitySearch` под текущий GPU (через MSBuild)
+
+Запуск:
+
+```powershell
+cd C:\path\to\MyWalletSearch
+python .\vanity_gui.py
+```
+
+Файлы создаются в `runs\` с именованием как в `run_puzzle71_69_72.sh`:
+- `seg_<base>.txt`
+- `progress_<base>.dat`
+- `out_<base>.txt`
+- `log_<base>.log`
 
 ---
 
@@ -278,48 +301,16 @@ Wildcard работает по правилу:
 
 ### 5.1 Формат файла сегментов
 
-Одна строка = один сегмент. Поддерживаются **два формата**:
+Одна строка = один сегмент:
 
 ```
-(A) percent:
-startPercent endPercent direction [name] [priority]
-
-(B) absolute (decimal/hex):
-startKey endKey direction [name] [priority]
+startPercent endPercent direction [name]
 ```
-
-#### Важно про неоднозначность
-
-Строка вида:
-
-```
-10 80 up
-```
-
-может означать и проценты, и “абсолютный” диапазон (decimal).
-
-Чтобы **однозначно** указать режим, можно добавить префикс:
-
-```txt
-pct 10 80 up mySeg 5
-abs 10 80 up mySeg 5
-dec 1711857850057426331109 1711857850057426331200 up known_slice 10
-```
-
-Если префикса нет — применяется эвристика для совместимости со старым форматом:
-- если значения похожи на проценты (например `0..100` и короткие) → это **percent**
-- иначе → это **absolute**
 
 Где:
-- **percent формат**:
-  - `startPercent`, `endPercent` — числа `0..100` (можно с точкой)
-- **absolute формат**:
-  - `startKey`, `endKey` — абсолютные значения ключа (десятичные), например:
-    - `1711857850057426331109`
-  - также допускается hex (`0x...` или просто hex-строка)
+- `startPercent`, `endPercent` — числа `0..100`
 - `direction` — `up` или `down` (можно `вверх/вниз`)
-- `name` — опциональное имя сегмента (если в имени пробелы — лучше заменить на `_`)
-- `priority` — опциональный целый приоритет (>=1). Чем больше — тем чаще сегмент выбирается потоками (weighted round-robin).
+- `name` — опциональное имя сегмента
 
 Пример `seg_dir_test.txt` (разнонаправленный тест):
 
@@ -331,13 +322,6 @@ dec 1711857850057426331109 1711857850057426331200 up known_slice 10
 **Важно про DOWN:**
 - ожидается формат `startPercent > endPercent`
 - DOWN идёт “сверху вниз” (от start к end)
-
-Пример absolute-диапазонов (десятичные):
-
-```txt
-1711857850057426331109 1711857850057426331200 up known_slice 10
-1711857850057426331200 1711857850057426331109 down known_slice_back 5
-```
 
 ### 5.2 Запуск сегментного поиска
 
