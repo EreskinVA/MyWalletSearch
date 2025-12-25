@@ -18,6 +18,10 @@ typedef struct {
   double endPercent;
   int direction;  // 0 = up, 1 = down
   std::string currentKey;  // Hex representation
+  int rangeMode;            // 0 = percent, 1 = absolute
+  std::string rangeStart;   // Hex representation (segment lower/upper boundary)
+  std::string rangeEnd;     // Hex representation (segment lower/upper boundary)
+  int priority;             // >=1
   bool active;
   uint64_t keysChecked;
   time_t lastUpdate;

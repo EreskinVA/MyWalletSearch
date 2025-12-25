@@ -61,8 +61,8 @@ SegmentSearch::~SegmentSearch() {
 #endif
 }
 
-void SegmentSearch::AddSegment(double startPercent, double endPercent, 
-                                SearchDirection direction, const std::string &name) {
+void SegmentSearch::AddSegment(double startPercent, double endPercent,
+                                SearchDirection direction, const std::string &name, int priority) {
 #ifndef WIN64
   pthread_mutex_lock(&mutex);
 #else
@@ -70,17 +70,20 @@ void SegmentSearch::AddSegment(double startPercent, double endPercent,
 #endif
   
   SearchSegment seg;
+  seg.rangeMode = RANGE_PERCENT;
   seg.startPercent = startPercent;
   seg.endPercent = endPercent;
   seg.direction = direction;
   seg.active = true;
   seg.name = name.empty() ? "Segment_" + std::to_string(segments.size() + 1) : name;
+  seg.priority = (priority <= 0 ? 1 : priority);
   
   segments.push_back(seg);
   activeSegments++;
   
   std::string segName = seg.name;
   std::string dirStr = (direction == DIRECTION_UP ? "ВВЕРХ" : "ВНИЗ");
+  int prio = seg.priority;
   
 #ifndef WIN64
   pthread_mutex_unlock(&mutex);
@@ -88,8 +91,102 @@ void SegmentSearch::AddSegment(double startPercent, double endPercent,
   ReleaseMutex(mutex);
 #endif
   
-  printf("[SegmentSearch] Добавлен сегмент: %s (%.2f%% -> %.2f%%, направление: %s)\n",
-         segName.c_str(), startPercent, endPercent, dirStr.c_str());
+  printf("[SegmentSearch] Добавлен сегмент: %s (%.6f%% -> %.6f%%, направление: %s, priority=%d)\n",
+         segName.c_str(), startPercent, endPercent, dirStr.c_str(), prio);
+}
+
+void SegmentSearch::AddSegmentRange(const Int &startKey, const Int &endKey,
+                                    SearchDirection direction, const std::string &name, int priority) {
+#ifndef WIN64
+  pthread_mutex_lock(&mutex);
+#else
+  WaitForSingleObject(mutex, INFINITE);
+#endif
+
+  SearchSegment seg;
+  seg.rangeMode = RANGE_ABSOLUTE;
+  seg.startPercent = -1.0;
+  seg.endPercent = -1.0;
+  seg.direction = direction;
+  seg.active = true;
+  seg.name = name.empty() ? "Segment_" + std::to_string(segments.size() + 1) : name;
+  seg.priority = (priority <= 0 ? 1 : priority);
+  seg.rangeStart.Set(&startKey);
+  seg.rangeEnd.Set(&endKey);
+  // currentKey выставим в InitializeSegments (с нормализацией UP/DOWN)
+
+  segments.push_back(seg);
+  activeSegments++;
+
+  std::string segName = seg.name;
+  std::string dirStr = (direction == DIRECTION_UP ? "ВВЕРХ" : "ВНИЗ");
+  int prio = seg.priority;
+  std::string sHex = seg.rangeStart.GetBase16();
+  std::string eHex = seg.rangeEnd.GetBase16();
+  std::string sDec = seg.rangeStart.GetBase10();
+  std::string eDec = seg.rangeEnd.GetBase10();
+
+#ifndef WIN64
+  pthread_mutex_unlock(&mutex);
+#else
+  ReleaseMutex(mutex);
+#endif
+
+  printf("[SegmentSearch] Добавлен сегмент: %s (ABS %s -> %s, hex %s -> %s, направление: %s, priority=%d)\n",
+         segName.c_str(), sDec.c_str(), eDec.c_str(), sHex.c_str(), eHex.c_str(), dirStr.c_str(), prio);
+}
+
+static bool IsAllDigits(const std::string &s) {
+  if (s.empty()) return false;
+  size_t i = 0;
+  if (s[0] == '+') i = 1;
+  if (i >= s.size()) return false;
+  for (; i < s.size(); i++) {
+    if (s[i] < '0' || s[i] > '9') return false;
+  }
+  return true;
+}
+
+static bool LooksLikePercent(const std::string &a, const std::string &b) {
+  auto hasDot = [](const std::string &s) { return s.find('.') != std::string::npos; };
+  auto hasPct = [](const std::string &s) { return !s.empty() && s.back() == '%'; };
+  if (hasDot(a) || hasDot(b) || hasPct(a) || hasPct(b)) return true;
+  // Совместимость со старым форматом: "45 54 up"
+  if (IsAllDigits(a) && IsAllDigits(b) && a.size() <= 3 && b.size() <= 3) {
+    int ai = atoi(a.c_str());
+    int bi = atoi(b.c_str());
+    return (ai >= 0 && ai <= 100 && bi >= 0 && bi <= 100);
+  }
+  return false;
+}
+
+static bool ParseIntAuto(const std::string &tok, Int &out) {
+  std::string s = tok;
+  if (s.empty()) return false;
+  if (s.rfind("0x", 0) == 0 || s.rfind("0X", 0) == 0) {
+    std::string hex = s.substr(2);
+    out.SetBase16((char *)hex.c_str());
+    return true;
+  }
+  bool hasHexAlpha = false;
+  for (char c : s) {
+    if ((c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) { hasHexAlpha = true; break; }
+  }
+  if (hasHexAlpha) {
+    out.SetBase16((char *)s.c_str());
+    return true;
+  }
+  out.SetBase10((char *)s.c_str());
+  return true;
+}
+
+static bool IsModeToken(const std::string &s, const char *tok) {
+  if (s.size() != strlen(tok)) return false;
+  for (size_t i = 0; i < s.size(); i++) {
+    char c = (char)tolower(s[i]);
+    if (c != tok[i]) return false;
+  }
+  return true;
 }
 
 bool SegmentSearch::LoadSegmentsFromFile(const std::string &filename) {
@@ -112,23 +209,67 @@ bool SegmentSearch::LoadSegmentsFromFile(const std::string &filename) {
       continue;
     }
     
-    // Формат: startPercent endPercent direction [name]
-    // Пример: 45.0 54.0 up segment1
-    // Пример: 59.0 54.0 down segment2
-    
+    // Поддерживаем два формата:
+    //
+    // (A) Проценты:
+    //   startPercent endPercent direction [name] [priority]
+    //   45.0 54.0 up seg1 10
+    //
+    // (B) Абсолютные ключи (decimal/hex):
+    //   startKey endKey direction [name] [priority]
+    //   1711857850057426331109 1711857850057426331200 up
+    //   0x5CCB... 0x5CCE... down mySeg 5
     std::istringstream iss(line);
-    double start, end;
-    std::string dirStr, name;
-    
-    if (!(iss >> start >> end >> dirStr)) {
+    std::vector<std::string> toks;
+    std::string t;
+    while (iss >> t) toks.push_back(t);
+    if (toks.size() < 3) {
       printf("[SegmentSearch] Предупреждение: неверный формат строки %d, пропускаем\n", lineNum);
       continue;
     }
-    
-    // Прочитать имя (опционально)
-    iss >> name;
-    if (name.empty()) {
-      name = "Line_" + std::to_string(lineNum);
+
+    // Optional explicit mode marker to avoid ambiguity:
+    //   pct 10 80 up ...
+    //   abs 171185... 171185... up ...
+    //   dec 171185... 171185... up ...
+    // If отсутствует — используем эвристику (совместимость со старыми percent-файлами).
+    bool forcedPercent = false;
+    bool forcedAbsolute = false;
+    size_t baseIdx = 0;
+    if (IsModeToken(toks[0], "pct") || IsModeToken(toks[0], "percent")) {
+      forcedPercent = true;
+      baseIdx = 1;
+    } else if (IsModeToken(toks[0], "abs") || IsModeToken(toks[0], "dec") || IsModeToken(toks[0], "key")) {
+      forcedAbsolute = true;
+      baseIdx = 1;
+    }
+
+    if (toks.size() < baseIdx + 3) {
+      printf("[SegmentSearch] Предупреждение: неверный формат строки %d, пропускаем\n", lineNum);
+      continue;
+    }
+
+    std::string startTok = toks[baseIdx + 0];
+    std::string endTok = toks[baseIdx + 1];
+    std::string dirStr = toks[baseIdx + 2];
+
+    std::string name = "Line_" + std::to_string(lineNum);
+    int priority = 1;
+    if (toks.size() >= baseIdx + 4) {
+      std::string last = toks.back();
+      bool lastIsPrio = IsAllDigits(last) && last.size() <= 6;
+      if (lastIsPrio) {
+        priority = atoi(last.c_str());
+      }
+      size_t nameEnd = toks.size();
+      if (lastIsPrio) nameEnd--;
+      if (nameEnd > baseIdx + 3) {
+        name.clear();
+        for (size_t i = baseIdx + 3; i < nameEnd; i++) {
+          if (!name.empty()) name.push_back('_');
+          name += toks[i];
+        }
+      }
     }
     
     // Определить направление
@@ -144,13 +285,25 @@ bool SegmentSearch::LoadSegmentsFromFile(const std::string &filename) {
       dir = DIRECTION_UP;
     }
     
-    // Проверка диапазона
-    if (start < 0.0 || start > 100.0 || end < 0.0 || end > 100.0) {
-      printf("[SegmentSearch] Предупреждение: проценты вне диапазона 0-100 в строке %d, пропускаем\n", lineNum);
-      continue;
+    bool isPercent = forcedPercent || (!forcedAbsolute && LooksLikePercent(startTok, endTok));
+    if (isPercent) {
+      if (!startTok.empty() && startTok.back() == '%') startTok.pop_back();
+      if (!endTok.empty() && endTok.back() == '%') endTok.pop_back();
+      double start = atof(startTok.c_str());
+      double end = atof(endTok.c_str());
+      if (start < 0.0 || start > 100.0 || end < 0.0 || end > 100.0) {
+        printf("[SegmentSearch] Предупреждение: проценты вне диапазона 0-100 в строке %d, пропускаем\n", lineNum);
+        continue;
+      }
+      AddSegment(start, end, dir, name, priority);
+    } else {
+      Int sKey, eKey;
+      if (!ParseIntAuto(startTok, sKey) || !ParseIntAuto(endTok, eKey)) {
+        printf("[SegmentSearch] Предупреждение: не удалось распарсить ключи в строке %d, пропускаем\n", lineNum);
+        continue;
+      }
+      AddSegmentRange(sKey, eKey, dir, name, priority);
     }
-    
-    AddSegment(start, end, dir, name);
   }
   
   file.close();
@@ -208,10 +361,39 @@ void SegmentSearch::InitializeSegments(int bits) {
   std::vector<std::string> segNames;
   std::vector<std::string> segStartStrs;
   std::vector<std::string> segEndStrs;
+  std::vector<std::string> segStartDecStrs;
+  std::vector<std::string> segEndDecStrs;
+  std::vector<int> segRangeModes;
   
   for (size_t i = 0; i < segments.size(); i++) {
-    CalculateKeyAtPercent(segments[i].startPercent, segments[i].rangeStart);
-    CalculateKeyAtPercent(segments[i].endPercent, segments[i].rangeEnd);
+    if (segments[i].rangeMode == RANGE_PERCENT) {
+      CalculateKeyAtPercent(segments[i].startPercent, segments[i].rangeStart);
+      CalculateKeyAtPercent(segments[i].endPercent, segments[i].rangeEnd);
+    }
+
+    // Кламп в общий диапазон (защита от ошибок конфигурации)
+    if (segments[i].rangeStart.IsLower(&fullRangeStart)) segments[i].rangeStart.Set(&fullRangeStart);
+    if (segments[i].rangeStart.IsGreater(&fullRangeEnd)) segments[i].rangeStart.Set(&fullRangeEnd);
+    if (segments[i].rangeEnd.IsLower(&fullRangeStart)) segments[i].rangeEnd.Set(&fullRangeStart);
+    if (segments[i].rangeEnd.IsGreater(&fullRangeEnd)) segments[i].rangeEnd.Set(&fullRangeEnd);
+
+    // Нормализация границ в зависимости от направления
+    if (segments[i].direction == DIRECTION_UP) {
+      if (segments[i].rangeStart.IsGreater(&segments[i].rangeEnd)) {
+        Int tmp;
+        tmp.Set(&segments[i].rangeStart);
+        segments[i].rangeStart.Set(&segments[i].rangeEnd);
+        segments[i].rangeEnd.Set(&tmp);
+      }
+    } else {
+      // DOWN: rangeStart должен быть верхней границей
+      if (segments[i].rangeStart.IsLower(&segments[i].rangeEnd)) {
+        Int tmp;
+        tmp.Set(&segments[i].rangeStart);
+        segments[i].rangeStart.Set(&segments[i].rangeEnd);
+        segments[i].rangeEnd.Set(&tmp);
+      }
+    }
     
     // Установить начальную позицию в зависимости от направления
     if (segments[i].direction == DIRECTION_UP) {
@@ -225,6 +407,9 @@ void SegmentSearch::InitializeSegments(int bits) {
     segNames.push_back(segments[i].name);
     segStartStrs.push_back(segments[i].rangeStart.GetBase16());
     segEndStrs.push_back(segments[i].rangeEnd.GetBase16());
+    segStartDecStrs.push_back(segments[i].rangeStart.GetBase10());
+    segEndDecStrs.push_back(segments[i].rangeEnd.GetBase10());
+    segRangeModes.push_back((int)segments[i].rangeMode);
   }
   
 #ifndef WIN64
@@ -238,10 +423,19 @@ void SegmentSearch::InitializeSegments(int bits) {
   printf("[SegmentSearch]      до: %s\n", endStr.c_str());
   
   for (size_t i = 0; i < segNames.size(); i++) {
-    printf("[SegmentSearch] %s: %s -> %s\n", 
-           segNames[i].c_str(),
-           segStartStrs[i].c_str(),
-           segEndStrs[i].c_str());
+    if (segRangeModes[i] == (int)RANGE_ABSOLUTE) {
+      printf("[SegmentSearch] %s: ABS %s -> %s (hex %s -> %s)\n",
+             segNames[i].c_str(),
+             segStartDecStrs[i].c_str(),
+             segEndDecStrs[i].c_str(),
+             segStartStrs[i].c_str(),
+             segEndStrs[i].c_str());
+    } else {
+      printf("[SegmentSearch] %s: %s -> %s\n",
+             segNames[i].c_str(),
+             segStartStrs[i].c_str(),
+             segEndStrs[i].c_str());
+    }
   }
 }
 
@@ -290,21 +484,25 @@ int SegmentSearch::GetSegmentForThread(int threadId) {
     return seg;
   }
   
-  // Простое распределение: round-robin по активным сегментам
-  int activeCount = 0;
-  int activeSegCount = activeSegments;
+  // Простое распределение с учетом приоритета: weighted round-robin.
+  // weight = max(1, priority), capped to avoid huge vectors.
+  std::vector<int> weighted;
+  weighted.reserve(segments.size());
   for (size_t i = 0; i < segments.size(); i++) {
-    if (segments[i].active) {
-      if (activeCount == (threadId % activeSegCount)) {
+    if (!segments[i].active) continue;
+    int w = segments[i].priority;
+    if (w <= 0) w = 1;
+    if (w > 1024) w = 1024;
+    for (int k = 0; k < w; k++) weighted.push_back((int)i);
+  }
+  if (!weighted.empty()) {
+    int idx = weighted[(size_t)threadId % weighted.size()];
 #ifndef WIN64
-        pthread_mutex_unlock(&mutex);
+    pthread_mutex_unlock(&mutex);
 #else
-        ReleaseMutex(mutex);
+    ReleaseMutex(mutex);
 #endif
-        return i;
-      }
-      activeCount++;
-    }
+    return idx;
   }
   
 #ifndef WIN64
@@ -372,11 +570,14 @@ bool SegmentSearch::GetStartingKey(int threadId, Int &key) {
   
   key.Set(&seg.currentKey);
   
-  // Добавляем смещение для потока, чтобы потоки не искали в одном месте
+  // Добавляем небольшое смещение для потока, чтобы потоки не искали в одном месте.
+  // Для DOWN смещение должно идти "вниз", иначе мы улетим за верхнюю границу.
   Int offset((int64_t)threadId);
-  // Важно: не используем огромное смещение (<<32), чтобы не улетать за пределы маленьких сегментов.
-  // Достаточно разнести потоки на несколько первых ключей.
-  key.Add(&offset);
+  if (seg.direction == DIRECTION_UP) {
+    key.Add(&offset);
+  } else {
+    key.Sub(&offset);
+  }
   
 #ifndef WIN64
   pthread_mutex_unlock(&mutex);
@@ -519,6 +720,10 @@ void SegmentSearch::PrintSegments() {
   std::vector<bool> actives;
   std::vector<std::string> startStrs;
   std::vector<std::string> endStrs;
+  std::vector<std::string> startDecStrs;
+  std::vector<std::string> endDecStrs;
+  std::vector<int> rangeModes;
+  std::vector<int> priorities;
   
   for (size_t i = 0; i < segments.size(); i++) {
     const SearchSegment &seg = segments[i];
@@ -527,11 +732,15 @@ void SegmentSearch::PrintSegments() {
     endPercents.push_back(seg.endPercent);
     directions.push_back(seg.direction == DIRECTION_UP ? "ВВЕРХ ↑" : "ВНИЗ ↓");
     actives.push_back(seg.active);
+    rangeModes.push_back((int)seg.rangeMode);
+    priorities.push_back(seg.priority);
     Int tmp1, tmp2;
     tmp1.Set((Int*)&seg.rangeStart);
     tmp2.Set((Int*)&seg.rangeEnd);
     startStrs.push_back(tmp1.GetBase16());
     endStrs.push_back(tmp2.GetBase16());
+    startDecStrs.push_back(tmp1.GetBase10());
+    endDecStrs.push_back(tmp2.GetBase10());
   }
   
 #ifndef WIN64
@@ -547,11 +756,21 @@ void SegmentSearch::PrintSegments() {
   
   for (size_t i = 0; i < segNames.size(); i++) {
     printf("Сегмент %zu: %s\n", i + 1, segNames[i].c_str());
-    printf("  Диапазон: %.2f%% -> %.2f%%\n", startPercents[i], endPercents[i]);
+    if (rangeModes[i] == (int)RANGE_ABSOLUTE) {
+      printf("  Диапазон: ABS\n");
+    } else {
+      printf("  Диапазон: %.2f%% -> %.2f%%\n", startPercents[i], endPercents[i]);
+    }
     printf("  Направление: %s\n", directions[i].c_str());
     printf("  Статус: %s\n", actives[i] ? "Активен" : "Завершен");
-    printf("  Начало: %s\n", startStrs[i].c_str());
-    printf("  Конец:  %s\n", endStrs[i].c_str());
+    printf("  Priority: %d\n", priorities[i]);
+    if (rangeModes[i] == (int)RANGE_ABSOLUTE) {
+      printf("  Начало: %s (hex %s)\n", startDecStrs[i].c_str(), startStrs[i].c_str());
+      printf("  Конец:  %s (hex %s)\n", endDecStrs[i].c_str(), endStrs[i].c_str());
+    } else {
+      printf("  Начало: %s\n", startStrs[i].c_str());
+      printf("  Конец:  %s\n", endStrs[i].c_str());
+    }
     printf("\n");
   }
   
@@ -931,6 +1150,10 @@ void SegmentSearch::ExportToProgress() {
       currentProgress.segments[i].currentKey = segments[i].currentKey.GetBase16();
       currentProgress.segments[i].active = segments[i].active;
       currentProgress.segments[i].lastUpdate = time(NULL);
+      currentProgress.segments[i].rangeMode = (int)segments[i].rangeMode;
+      currentProgress.segments[i].rangeStart = segments[i].rangeStart.GetBase16();
+      currentProgress.segments[i].rangeEnd = segments[i].rangeEnd.GetBase16();
+      currentProgress.segments[i].priority = segments[i].priority;
       // keysChecked сохраняем из текущего прогресса (не сбрасываем!)
     } else {
       // Создаем новый сегмент
@@ -939,6 +1162,10 @@ void SegmentSearch::ExportToProgress() {
       sp.startPercent = segments[i].startPercent;
       sp.endPercent = segments[i].endPercent;
       sp.direction = (segments[i].direction == DIRECTION_UP) ? 0 : 1;
+      sp.rangeMode = (int)segments[i].rangeMode;
+      sp.rangeStart = segments[i].rangeStart.GetBase16();
+      sp.rangeEnd = segments[i].rangeEnd.GetBase16();
+      sp.priority = segments[i].priority;
       sp.currentKey = segments[i].currentKey.GetBase16();
       sp.active = segments[i].active;
       sp.keysChecked = 0;  // Только для новых сегментов

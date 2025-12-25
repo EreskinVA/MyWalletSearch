@@ -30,8 +30,15 @@ enum SearchAlgorithm {
   ALGORITHM_KANGAROO   // Pollard's Kangaroo (O(sqrt(N)))
 };
 
+// Режим задания диапазона сегмента
+enum SegmentRangeMode {
+  RANGE_PERCENT = 0,   // start/end заданы в процентах 0..100
+  RANGE_ABSOLUTE = 1   // start/end заданы абсолютными значениями ключа (Int)
+};
+
 // Структура для описания одного сегмента поиска
 typedef struct {
+  SegmentRangeMode rangeMode; // Проценты или абсолютный диапазон
   double startPercent;        // Начало сегмента в процентах (0.0 - 100.0)
   double endPercent;          // Конец сегмента в процентах (0.0 - 100.0)
   SearchDirection direction;  // Направление поиска
@@ -40,6 +47,7 @@ typedef struct {
   Int currentKey;            // Текущая позиция поиска
   bool active;               // Активен ли этот сегмент
   std::string name;          // Имя сегмента для логирования
+  int priority;              // Приоритет сегмента (>=1). Влияет на распределение потоков.
 } SearchSegment;
 
 class SegmentSearch {
@@ -53,7 +61,11 @@ public:
   
   // Добавить сегмент вручную
   void AddSegment(double startPercent, double endPercent, 
-                  SearchDirection direction, const std::string &name = "");
+                  SearchDirection direction, const std::string &name = "", int priority = 1);
+  
+  // Добавить сегмент вручную абсолютным диапазоном (десятичные/hex значения ключей)
+  void AddSegmentRange(const Int &startKey, const Int &endKey,
+                       SearchDirection direction, const std::string &name = "", int priority = 1);
   
   // Инициализировать все сегменты для заданного битового диапазона
   void InitializeSegments(int bitRange);

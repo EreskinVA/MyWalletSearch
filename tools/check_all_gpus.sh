@@ -83,3 +83,4 @@ echo "Успешные параметры: $ok_file"
 echo "Проблемные GPU:     $fail_file"
 
 
+

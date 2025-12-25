@@ -12,7 +12,7 @@
 #include <cstdint>
 #include <limits>
 
-#define PROGRESS_FILE_VERSION 1
+#define PROGRESS_FILE_VERSION 2
 
 ProgressManager::ProgressManager() {
   progressFile = "vanitysearch_progress.dat";
@@ -109,6 +109,10 @@ bool ProgressManager::WriteProgressToFile(const SearchProgress &progress) {
     file << "StartPercent=" << seg.startPercent << "\n";
     file << "EndPercent=" << seg.endPercent << "\n";
     file << "Direction=" << seg.direction << "\n";
+    file << "RangeMode=" << seg.rangeMode << "\n";
+    file << "RangeStart=" << seg.rangeStart << "\n";
+    file << "RangeEnd=" << seg.rangeEnd << "\n";
+    file << "Priority=" << seg.priority << "\n";
     file << "CurrentKey=" << seg.currentKey << "\n";
     file << "Active=" << (seg.active ? "1" : "0") << "\n";
     file << "KeysChecked=" << seg.keysChecked << "\n";
@@ -172,6 +176,14 @@ bool ProgressManager::ReadProgressFromFile(SearchProgress &progress) {
           currentSeg.endPercent = atof(value.c_str());
         } else if (key == "Direction") {
           currentSeg.direction = atoi(value.c_str());
+        } else if (key == "RangeMode") {
+          currentSeg.rangeMode = atoi(value.c_str());
+        } else if (key == "RangeStart") {
+          currentSeg.rangeStart = value;
+        } else if (key == "RangeEnd") {
+          currentSeg.rangeEnd = value;
+        } else if (key == "Priority") {
+          currentSeg.priority = atoi(value.c_str());
         } else if (key == "CurrentKey") {
           currentSeg.currentKey = value;
         } else if (key == "Active") {
@@ -188,6 +200,9 @@ bool ProgressManager::ReadProgressFromFile(SearchProgress &progress) {
     if (line == "SEGMENT_START") {
       inSegment = true;
       currentSeg = SegmentProgress();
+      // defaults for backward-compat
+      currentSeg.rangeMode = 0;
+      currentSeg.priority = 1;
     } else if (line == "SEGMENT_END") {
       inSegment = false;
       progress.segments.push_back(currentSeg);
@@ -203,6 +218,11 @@ bool ProgressManager::ValidateProgress(const SearchProgress &progress) {
   // Базовая валидация
   if (progress.bitRange < 1 || progress.bitRange > 256) {
     printf("[ProgressManager] Ошибка: некорректный bitRange %d\n", progress.bitRange);
+    return false;
+  }
+
+  if (progress.version < 1 || progress.version > PROGRESS_FILE_VERSION) {
+    printf("[ProgressManager] Ошибка: неподдерживаемая версия progress файла: %d\n", progress.version);
     return false;
   }
   
