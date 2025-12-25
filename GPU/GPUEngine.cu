@@ -318,18 +318,18 @@ GPUEngine::GPUEngine(int nbThreadGroup, int nbThreadPerGroup, int gpuId, uint32_
   }
 
   while (curGroups >= 1 && !stackOk) {
-    for (size_t k = 0; k < sizeof(stackCandidates) / sizeof(stackCandidates[0]); k++) {
-      size_t stackSize = stackCandidates[k];
-      err = cudaDeviceSetLimit(cudaLimitStackSize, stackSize);
-      if (err == cudaSuccess) {
-        stackOk = true;
-        selectedStack = stackSize;
-        (void)cudaGetLastError();
-        break;
-      }
-      printf("GPUEngine: cudaDeviceSetLimit(stack=%zu) failed: %s\n", stackSize, cudaGetErrorString(err));
+  for (size_t k = 0; k < sizeof(stackCandidates) / sizeof(stackCandidates[0]); k++) {
+    size_t stackSize = stackCandidates[k];
+    err = cudaDeviceSetLimit(cudaLimitStackSize, stackSize);
+    if (err == cudaSuccess) {
+      stackOk = true;
+      selectedStack = stackSize;
       (void)cudaGetLastError();
+      break;
     }
+    printf("GPUEngine: cudaDeviceSetLimit(stack=%zu) failed: %s\n", stackSize, cudaGetErrorString(err));
+    (void)cudaGetLastError();
+  }
     if (!stackOk) {
       if (curGroups == 1) break;
       int newGroups = curGroups / 2;
@@ -355,7 +355,7 @@ GPUEngine::GPUEngine(int nbThreadGroup, int nbThreadPerGroup, int gpuId, uint32_
            minRequiredStack, currentStack);
     printf("GPUEngine: WARNING: if results look suspicious, run `./VanitySearch -check` or reduce -g.\n");
   } else {
-    printf("GPUEngine: cudaLimitStackSize set to %zu bytes\n", selectedStack);
+  printf("GPUEngine: cudaLimitStackSize set to %zu bytes\n", selectedStack);
     if (selectedStack < minRequiredStack) {
       printf("GPUEngine: WARNING: stack size %zu < recommended %zu; results may be incorrect. Consider smaller -g or run -check.\n",
              selectedStack, minRequiredStack);

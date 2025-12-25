@@ -889,6 +889,12 @@ void VanitySearch::output(string addr,string pAddr,string pAddrHex) {
       break;
     }
     fprintf(f, "Priv (HEX): 0x%s\n", pAddrHex.c_str());
+    // Дополнительно: десятичное представление приватного ключа (удобно как "позиция" в диапазоне)
+    {
+      Int k;
+      k.SetBase16((char *)pAddrHex.c_str());
+      fprintf(f, "Priv (DEC): %s\n", k.GetBase10().c_str());
+    }
 
   }
 

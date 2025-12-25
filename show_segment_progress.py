@@ -16,6 +16,59 @@ try:
 except Exception:
     pass
 
+def infer_out_file(progress_file: str) -> str:
+    """
+    Пытается угадать out-файл по имени progress-файла.
+    Примеры:
+      progress_puzzle71_69_72.dat -> out_puzzle71_69_72.txt
+      prog_cpu_p3.dat            -> out_cpu_p3.txt
+    """
+    base = os.path.basename(progress_file)
+    # убираем расширение
+    if base.endswith('.dat'):
+        stem = base[:-4]
+    else:
+        stem = base
+
+    candidates = []
+    if stem.startswith('progress_'):
+        candidates.append('out_' + stem[len('progress_'):] + '.txt')
+    if stem.startswith('prog_'):
+        candidates.append('out_' + stem[len('prog_'):] + '.txt')
+
+    # общий случай: заменить progress->out
+    if 'progress' in stem:
+        candidates.append(stem.replace('progress', 'out') + '.txt')
+
+    # fallback: out_<stem>.txt
+    candidates.append('out_' + stem + '.txt')
+
+    # проверяем существование рядом с progress файлом
+    dirn = os.path.dirname(progress_file) or '.'
+    for c in candidates:
+        p = os.path.join(dirn, c)
+        if os.path.exists(p):
+            return p
+    # если не нашли — вернём самый вероятный кандидат, чтобы в выводе было видно, что ожидалось
+    return os.path.join(dirn, candidates[0]) if candidates else ''
+
+def count_found_in_out(out_file: str) -> int:
+    """
+    Считает количество найденных адресов в out-файле.
+    VanitySearch пишет найденные записи блоками, где строка начинается с 'PubAddress:'.
+    """
+    if not out_file or not os.path.exists(out_file):
+        return -1
+    cnt = 0
+    try:
+        with open(out_file, 'r', errors='ignore') as f:
+            for line in f:
+                if line.startswith('PubAddress:'):
+                    cnt += 1
+    except Exception:
+        return -1
+    return cnt
+
 def parse_hex_to_int(hex_str):
     """Конвертирует hex строку в int"""
     if not hex_str:
@@ -183,6 +236,9 @@ def format_time(ts):
 def main():
     seg_file = sys.argv[1] if len(sys.argv) > 1 else 'seg_gpu_range.txt'
     progress_file = sys.argv[2] if len(sys.argv) > 2 else 'progress_gpu_range.dat'
+    out_file = sys.argv[3] if len(sys.argv) > 3 else ''
+    if not out_file:
+        out_file = infer_out_file(progress_file)
     
     # Парсим конфигурацию сегментов
     seg_config = parse_seg_file(seg_file)
@@ -205,6 +261,15 @@ def main():
     print(f"Файл прогресса:    {progress_file}")
     print(f"Битовый диапазон:  {progress['bitRange']}")
     print(f"Целевой адрес:     {progress['targetAddress']}")
+    # Найдено (по out-файлу, если он задан или удалось угадать)
+    found_cnt = count_found_in_out(out_file)
+    if found_cnt >= 0:
+        print(f"Найдено:           {found_cnt} (из {os.path.basename(out_file)})")
+    else:
+        if out_file:
+            print(f"Найдено:           N/A (не найден out-файл: {os.path.basename(out_file)})")
+        else:
+            print("Найдено:           N/A (out-файл не указан)")
     print(f"Всего проверено:   {format_number(progress['totalKeysChecked'])} ключей")
     if progress['startTime'] > 0:
         print(f"Начало поиска:     {format_time(progress['startTime'])}")

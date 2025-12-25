@@ -238,6 +238,12 @@ void outputAdd(string outputFile, int addrType, string addr, string pAddr, strin
     break;
   }
   fprintf(f, "Priv (HEX): 0x%s\n", pAddrHex.c_str());
+  // Десятичное представление приватного ключа (удобно как "позиция")
+  {
+    Int k;
+    k.SetBase16((char *)pAddrHex.c_str());
+    fprintf(f, "Priv (DEC): %s\n", k.GetBase10().c_str());
+  }
 
   if (needToClose)
     fclose(f);
