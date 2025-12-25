@@ -8,6 +8,7 @@
 #include <sstream>
 #include <iostream>
 #include <algorithm>
+#include <cstring>
 #ifndef WIN64
 #include <pthread.h>
 #else
