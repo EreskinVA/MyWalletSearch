@@ -1,0 +1,257 @@
+#!/usr/bin/env python3
+"""
+Детальный просмотр прогресса по сегментам
+Читает seg-файл для границ и progress-файл для текущих позиций
+"""
+
+import sys
+import os
+import re
+from datetime import datetime
+
+def parse_hex_to_int(hex_str):
+    """Конвертирует hex строку в int"""
+    if not hex_str:
+        return None
+    try:
+        return int(hex_str, 16)
+    except:
+        return None
+
+def parse_seg_file(seg_file):
+    """Парсит seg файл и возвращает словарь сегментов {name: (start, end, direction)}"""
+    segments = {}
+    if not os.path.exists(seg_file):
+        return segments
+    
+    with open(seg_file, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            
+            # Формат: abs <start_dec> <end_dec> <up|down> <name> [priority]
+            parts = line.split()
+            if len(parts) >= 5 and parts[0] in ('abs', 'dec', 'key'):
+                try:
+                    start = int(parts[1])
+                    end = int(parts[2])
+                    direction = 0 if parts[3].lower() == 'up' else 1
+                    name = parts[4]
+                    segments[name] = (start, end, direction)
+                except (ValueError, IndexError):
+                    continue
+    
+    return segments
+
+def parse_progress_file(progress_file):
+    """Парсит progress файл и возвращает данные о прогрессе"""
+    if not os.path.exists(progress_file):
+        return None
+    
+    progress = {
+        'totalKeysChecked': 0,
+        'bitRange': 0,
+        'startTime': 0,
+        'lastSaveTime': 0,
+        'targetAddress': '',
+        'segments': []
+    }
+    
+    current_seg = None
+    in_segment = False
+    
+    with open(progress_file, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#') or line == '---END---':
+                continue
+            
+            if line == 'SEGMENT_START':
+                in_segment = True
+                current_seg = {}
+                continue
+            elif line == 'SEGMENT_END':
+                if current_seg:
+                    progress['segments'].append(current_seg)
+                in_segment = False
+                current_seg = None
+                continue
+            
+            if '=' in line:
+                key, value = line.split('=', 1)
+                
+                if not in_segment:
+                    if key == 'TotalKeysChecked':
+                        progress['totalKeysChecked'] = int(value) if value.isdigit() else 0
+                    elif key == 'BitRange':
+                        progress['bitRange'] = int(value) if value.isdigit() else 0
+                    elif key == 'StartTime':
+                        progress['startTime'] = int(value) if value.isdigit() else 0
+                    elif key == 'LastSaveTime':
+                        progress['lastSaveTime'] = int(value) if value.isdigit() else 0
+                    elif key == 'TargetAddress':
+                        progress['targetAddress'] = value
+                else:
+                    if key == 'Name':
+                        current_seg['name'] = value
+                    elif key == 'RangeStart':
+                        current_seg['rangeStart'] = value
+                    elif key == 'RangeEnd':
+                        current_seg['rangeEnd'] = value
+                    elif key == 'CurrentKey':
+                        current_seg['currentKey'] = value
+                    elif key == 'Direction':
+                        current_seg['direction'] = int(value) if value.isdigit() else 0
+                    elif key == 'KeysChecked':
+                        current_seg['keysChecked'] = int(value) if value.isdigit() else 0
+                    elif key == 'Active':
+                        current_seg['active'] = (value == '1')
+                    elif key == 'RangeMode':
+                        current_seg['rangeMode'] = int(value) if value.isdigit() else 0
+    
+    return progress
+
+def calculate_segment_progress(seg_config, seg_progress):
+    """Вычисляет прогресс сегмента в процентах и остаток"""
+    name = seg_progress.get('name', '')
+    if name not in seg_config:
+        return None, None, None, None
+    
+    config_start, config_end, config_dir = seg_config[name]
+    
+    # Используем данные из progress файла (hex) если они есть, иначе из config (dec)
+    range_start_hex = seg_progress.get('rangeStart', '')
+    range_end_hex = seg_progress.get('rangeEnd', '')
+    current_key_hex = seg_progress.get('currentKey', '')
+    direction = seg_progress.get('direction', config_dir)
+    
+    # Конвертируем hex в int
+    range_start = parse_hex_to_int(range_start_hex) if range_start_hex else config_start
+    range_end = parse_hex_to_int(range_end_hex) if range_end_hex else config_end
+    current_key = parse_hex_to_int(current_key_hex) if current_key_hex else None
+    
+    if current_key is None:
+        return None, None, None, None
+    
+    # Вычисляем размер сегмента
+    if direction == 0:  # UP
+        seg_size = range_end - range_start
+        progress = current_key - range_start
+        remaining = range_end - current_key
+    else:  # DOWN
+        seg_size = range_start - range_end
+        progress = range_start - current_key
+        remaining = current_key - range_end
+    
+    if seg_size <= 0:
+        return None, None, None, None
+    
+    percent = (progress / seg_size) * 100.0 if seg_size > 0 else 0.0
+    percent = max(0.0, min(100.0, percent))  # Clamp to [0, 100]
+    
+    return percent, progress, remaining, seg_size
+
+def format_number(num):
+    """Форматирует большое число в читаемый вид"""
+    if num is None:
+        return "N/A"
+    if num < 1000:
+        return str(num)
+    elif num < 1_000_000:
+        return f"{num/1000:.2f}K"
+    elif num < 1_000_000_000:
+        return f"{num/1_000_000:.2f}M"
+    elif num < 1_000_000_000_000:
+        return f"{num/1_000_000_000:.2f}G"
+    else:
+        return f"{num/1_000_000_000_000:.2f}T"
+
+def format_time(ts):
+    """Форматирует timestamp"""
+    if ts <= 0:
+        return "N/A"
+    return datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S")
+
+def main():
+    seg_file = sys.argv[1] if len(sys.argv) > 1 else 'seg_gpu_range.txt'
+    progress_file = sys.argv[2] if len(sys.argv) > 2 else 'progress_gpu_range.dat'
+    
+    # Парсим конфигурацию сегментов
+    seg_config = parse_seg_file(seg_file)
+    if not seg_config:
+        print(f"Ошибка: не удалось загрузить конфигурацию из {seg_file}")
+        sys.exit(1)
+    
+    # Парсим прогресс
+    progress = parse_progress_file(progress_file)
+    if not progress:
+        print(f"Ошибка: не удалось загрузить прогресс из {progress_file}")
+        print("Убедитесь что поиск запущен с параметром -progress")
+        sys.exit(1)
+    
+    # Заголовок
+    print("=" * 100)
+    print(f"Прогресс поиска")
+    print("=" * 100)
+    print(f"Файл конфигурации: {seg_file}")
+    print(f"Файл прогресса:    {progress_file}")
+    print(f"Битовый диапазон:  {progress['bitRange']}")
+    print(f"Целевой адрес:     {progress['targetAddress']}")
+    print(f"Всего проверено:   {format_number(progress['totalKeysChecked'])} ключей")
+    if progress['startTime'] > 0:
+        print(f"Начало поиска:     {format_time(progress['startTime'])}")
+    if progress['lastSaveTime'] > 0:
+        print(f"Последнее сохранение: {format_time(progress['lastSaveTime'])}")
+    print("=" * 100)
+    print()
+    
+    # Заголовок таблицы
+    print(f"{'Сегмент':<12} {'Статус':<8} {'Прогресс %':<12} {'Проверено':<15} {'Осталось':<15} {'Размер':<15} {'Ключей':<15}")
+    print("-" * 100)
+    
+    # Прогресс по сегментам
+    total_checked = 0
+    active_count = 0
+    completed_count = 0
+    
+    for seg_progress in progress['segments']:
+        name = seg_progress.get('name', 'unknown')
+        active = seg_progress.get('active', False)
+        keys_checked = seg_progress.get('keysChecked', 0)
+        
+        if active:
+            active_count += 1
+        else:
+            completed_count += 1
+        
+        total_checked += keys_checked
+        
+        # Вычисляем прогресс
+        percent, progress_val, remaining, seg_size = calculate_segment_progress(seg_config, seg_progress)
+        
+        status = "✓ Завершен" if not active else "▶ Активен"
+        
+        if percent is not None:
+            progress_str = f"{percent:.2f}%"
+            progress_num_str = format_number(progress_val)
+            remaining_str = format_number(remaining)
+            size_str = format_number(seg_size)
+        else:
+            progress_str = "N/A"
+            progress_num_str = "N/A"
+            remaining_str = "N/A"
+            size_str = "N/A"
+        
+        keys_str = format_number(keys_checked)
+        
+        print(f"{name:<12} {status:<8} {progress_str:<12} {progress_num_str:<15} {remaining_str:<15} {size_str:<15} {keys_str:<15}")
+    
+    print("-" * 100)
+    print(f"Всего сегментов: {len(progress['segments'])} | Активных: {active_count} | Завершено: {completed_count}")
+    print(f"Всего проверено ключей (сумма по сегментам): {format_number(total_checked)}")
+    print()
+
+if __name__ == '__main__':
+    main()
+

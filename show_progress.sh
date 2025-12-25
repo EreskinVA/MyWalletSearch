@@ -1,11 +1,18 @@
 #!/bin/bash
 # Скрипт для просмотра прогресса поиска
 
-PROGRESS_FILE="${1:-progress_gpu_range.dat}"
-LOG_FILE="${2:-log_gpu_range.log}"
+SEG_FILE="${1:-seg_gpu_range.txt}"
+PROGRESS_FILE="${2:-progress_gpu_range.dat}"
+LOG_FILE="${3:-log_gpu_range.log}"
 
-echo "=== Прогресс поиска ==="
+echo "=== Быстрый просмотр прогресса ==="
 echo ""
+
+# Детальный прогресс по сегментам (если есть Python скрипт)
+if [ -f "show_segment_progress.py" ] && [ -f "$PROGRESS_FILE" ]; then
+    python3 show_segment_progress.py "$SEG_FILE" "$PROGRESS_FILE"
+    echo ""
+fi
 
 # 1. Из лога - последняя строка статуса
 if [ -f "$LOG_FILE" ]; then
@@ -34,8 +41,8 @@ if [ -f "$LOG_FILE" ]; then
     echo ""
 fi
 
-# 2. Из progress файла (если есть)
-if [ -f "$PROGRESS_FILE" ]; then
+# 2. Краткая информация из progress файла (если детальный скрипт не отработал)
+if [ -f "$PROGRESS_FILE" ] && [ ! -f "show_segment_progress.py" ]; then
     echo "--- Детали из progress файла ---"
     if grep -q "VANITYSEARCH_PROGRESS" "$PROGRESS_FILE" 2>/dev/null; then
         total_keys=$(grep "^TotalKeysChecked=" "$PROGRESS_FILE" 2>/dev/null | cut -d= -f2)
@@ -48,21 +55,22 @@ if [ -f "$PROGRESS_FILE" ]; then
             echo "Битовый диапазон: $bit_range"
         fi
         
-        seg_count=$(grep -c "^SegmentName=" "$PROGRESS_FILE" 2>/dev/null || echo "0")
+        seg_count=$(grep -c "SEGMENT_START" "$PROGRESS_FILE" 2>/dev/null || echo "0")
         if [ "$seg_count" -gt 0 ]; then
             echo "Сегментов в файле: $seg_count"
         fi
     else
         echo "Файл прогресса не найден или неверный формат"
     fi
-else
+elif [ ! -f "$PROGRESS_FILE" ]; then
     echo "--- Файл прогресса не найден: $PROGRESS_FILE ---"
     echo "   (прогресс не сохраняется, используйте -progress в команде запуска)"
 fi
 
 echo ""
 echo "=== Полезные команды ==="
-echo "  Смотреть лог в реальном времени: tail -f $LOG_FILE"
-echo "  Проверить процесс: pgrep -fl VanitySearch"
-echo "  Посчитать найденные: ./count_found_gpu_range.sh"
+echo "  Детальный прогресс:    python3 show_segment_progress.py $SEG_FILE $PROGRESS_FILE"
+echo "  Смотреть лог:          tail -f $LOG_FILE"
+echo "  Проверить процесс:     pgrep -fl VanitySearch"
+echo "  Посчитать найденные:   ./count_found_gpu_range.sh"
 
