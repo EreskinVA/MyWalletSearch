@@ -52,13 +52,16 @@ if [ ! -f "$LOG_FILE" ]; then
     : > "$LOG_FILE"
 fi
 
-# Строим команду
-CMD="./VanitySearch -seg \"$SEG_FILE\" -bits \"$BITS\" -gpu -gpuId \"$GPU_ID\" -g \"$GRID\" -t \"$CPU_THREADS\" -m \"$MAXFOUND\" -progress \"$PROGRESS_FILE\" -autosave \"$AUTOSAVE_INTERVAL\" -o \"$OUT_FILE\" \"$PATTERN\""
+# Строим команду (паттерн должен быть последним аргументом)
+CMD="./VanitySearch -seg \"$SEG_FILE\" -bits \"$BITS\" -gpu -gpuId \"$GPU_ID\" -g \"$GRID\" -t \"$CPU_THREADS\" -m \"$MAXFOUND\" -progress \"$PROGRESS_FILE\" -autosave \"$AUTOSAVE_INTERVAL\" -o \"$OUT_FILE\""
 
-# Добавляем -resume если файл прогресса существует
+# Добавляем -resume если файл прогресса существует (ПЕРЕД паттерном)
 if [ -n "$RESUME_FLAG" ]; then
     CMD="$CMD $RESUME_FLAG"
 fi
+
+# Паттерн всегда последний аргумент
+CMD="$CMD $PATTERN"
 
 nohup bash -c "$CMD > \"$LOG_FILE\" 2>&1" &
 
