@@ -20,6 +20,7 @@
 
 #include <string>
 #include <vector>
+#include <unordered_set>
 #include "SECP256k1.h"
 #include "GPU/GPUEngine.h"
 #include "SegmentSearch.h"
@@ -174,6 +175,9 @@ private:
   bool useSegmentSearch;
   SegmentSearch *segmentSearch;
   int segmentBitRange;
+  
+  // Deduplication: track already written addresses to prevent duplicates
+  std::unordered_set<std::string> foundAddresses;
 
 #ifdef WIN64
   HANDLE ghMutex;

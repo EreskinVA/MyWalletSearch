@@ -793,8 +793,12 @@ string VanitySearch::GetExpectedTime(double keyRate,double keyCount) {
   char tmp[128];
   string ret;
 
-  if(hasPattern)
-    return "";
+  // Убрана проверка hasPattern - теперь Prob выводится и для wildcard паттернов
+  // if(hasPattern)
+  //   return "";
+
+  if(_difficulty <= 0)
+    return "";  // Защита от деления на ноль
 
   double P = 1.0/ _difficulty;
   // pow(1-P,keyCount) is the probality of failure after keyCount tries
@@ -860,6 +864,20 @@ void VanitySearch::output(string addr,string pAddr,string pAddrHex,
 #else
   pthread_mutex_lock(&ghMutex);
 #endif
+
+  // Deduplication: check if this address was already written
+  if (foundAddresses.find(addr) != foundAddresses.end()) {
+    // Address already written, skip duplicate
+#ifdef WIN64
+    ReleaseMutex(ghMutex);
+#else
+    pthread_mutex_unlock(&ghMutex);
+#endif
+    return;
+  }
+  
+  // Mark address as found
+  foundAddresses.insert(addr);
 
   FILE *f = stdout;
   bool needToClose = false;
