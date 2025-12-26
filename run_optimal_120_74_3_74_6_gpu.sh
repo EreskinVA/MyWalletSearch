@@ -55,6 +55,15 @@ if [ ! -f "$PATTERNS_FILE" ]; then
     exit 1
 fi
 
+# ВАЖНО: VanitySearch -i НЕ игнорирует комментарии: любая непустая строка = паттерн.
+# Поэтому здесь всегда делаем "clean" файл (убираем пустые строки и строки, начинающиеся с # или ;).
+PATTERNS_FILE_CLEAN="${PATTERNS_FILE}.clean"
+grep -vE '^[[:space:]]*$' "$PATTERNS_FILE" | grep -vE '^[[:space:]]*[#;]' > "$PATTERNS_FILE_CLEAN"
+if [ ! -s "$PATTERNS_FILE_CLEAN" ]; then
+    echo "❌ Ошибка: после очистки $PATTERNS_FILE_CLEAN пустой (проверьте содержимое $PATTERNS_FILE)"
+    exit 1
+fi
+
 # Проверка VanitySearch
 if [ ! -f "./VanitySearch" ]; then
     echo "❌ Ошибка: VanitySearch не найден!"
@@ -99,7 +108,7 @@ if [ -n "$RESUME_FLAG" ]; then
         -t $CPU_THREADS \
         -m $MAXFOUND \
         -o "$OUT_FILE" \
-        -i "$PATTERNS_FILE" \
+        -i "$PATTERNS_FILE_CLEAN" \
         "$PATTERN" \
         > "$LOG_FILE" 2>&1 &
 else
@@ -114,7 +123,7 @@ else
         -t $CPU_THREADS \
         -m $MAXFOUND \
         -o "$OUT_FILE" \
-        -i "$PATTERNS_FILE" \
+        -i "$PATTERNS_FILE_CLEAN" \
         "$PATTERN" \
         > "$LOG_FILE" 2>&1 &
 fi

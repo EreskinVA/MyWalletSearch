@@ -1,7 +1,3 @@
-# TARGET PACK (из VanitySearch/ANALYZE.txt)
-# Цель: давить в точный target слева направо, включая варианты с '?'.
-# По одному паттерну на строку. Использовать через: -i patterns_target_pack.txt
-
 1PWo3JeB*
 1PWo3JeB9*
 1PWo3JeB9j*
