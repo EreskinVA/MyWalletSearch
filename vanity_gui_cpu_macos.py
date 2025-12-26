@@ -19,6 +19,7 @@ import os
 import sys
 import time
 import threading
+import queue
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -34,6 +35,14 @@ try:
 except Exception as e:  # noqa: BLE001
     HAS_TK = False
     TK_IMPORT_ERROR = e
+
+HAS_ANALYZER = True
+try:
+    # Локальный модуль анализатора (в этой же папке)
+    import analyze_seg_74_5_76 as vs_analyzer  # type: ignore
+except Exception as e:  # noqa: BLE001
+    HAS_ANALYZER = False
+    ANALYZER_IMPORT_ERROR = e
 
 
 REPO_ROOT = Path(__file__).resolve().parent
@@ -374,11 +383,14 @@ class VanityMacGUI:
 
         self.prefix = StringVar(value="1PWo3JeB")
         self.suffix = StringVar(value="")
+        # Опционально: полный целевой адрес для метрик близости (LCP/matches)
+        self.target = StringVar(value="1PWo3JeB9jrGwfHDNpdGK54CRas7fsVzXU")
 
         self._proc_lock = threading.Lock()
         self._procs: dict[str, subprocess.Popen] = {}  # base_name -> process
         self._rebuild_thread: threading.Thread | None = None
         self._stop_rebuild = threading.Event()
+        self._ui_queue: "queue.Queue[tuple[str, str]]" = queue.Queue()
 
         top = ttk.Frame(self.root, padding=10)
         top.pack(fill=BOTH, expand=True)
@@ -390,6 +402,7 @@ class VanityMacGUI:
         ttk.Button(btn_row, text="STOP", command=self.stop_search).pack(side=LEFT)
         ttk.Button(btn_row, text="Tail log", command=self.show_tail).pack(side=LEFT, padx=10)
         ttk.Button(btn_row, text="Progress", command=self.show_progress).pack(side=LEFT)
+        ttk.Button(btn_row, text="Анализировать", command=self.run_analysis).pack(side=LEFT, padx=10)
         ttk.Button(btn_row, text="Open runs folder", command=self.open_runs_folder).pack(side=LEFT, padx=10)
         ttk.Button(btn_row, text="Clear output", command=self.clear_output).pack(side=RIGHT)
 
@@ -424,6 +437,13 @@ class VanityMacGUI:
         e_suffix.pack(side=LEFT, padx=6)
         attach_context_menu(e_suffix, allow_edit=True)
         ttk.Label(row2, text="(prefix*suffix)").pack(side=LEFT)
+
+        row3 = ttk.Frame(top)
+        row3.pack(fill=X, pady=(6, 0))
+        ttk.Label(row3, text="Target (optional):").pack(side=LEFT)
+        e_target = ttk.Entry(row3, textvariable=self.target, width=46)
+        e_target.pack(side=LEFT, padx=6)
+        attach_context_menu(e_target, allow_edit=True)
 
         mid = ttk.Panedwindow(top, orient=HORIZONTAL)
         mid.pack(fill=BOTH, expand=True, pady=(10, 0))
@@ -484,6 +504,9 @@ class VanityMacGUI:
         self.log(f"WORKDIR: {WORKDIR}\n")
         self.log(f"Binary:  {VANITY_BIN}\n")
         self.log(f"Default threads: {self.threads.get()} (hw.ncpu={ncpu})\n")
+        # Важно: tkinter не thread-safe. Все обновления UI — только из main-thread.
+        # Фоновые потоки кладут сообщения в очередь, а main-thread их вычитывает.
+        self.root.after(100, self._drain_ui_queue)
 
     # ----- helpers -----
     def log(self, s: str) -> None:
@@ -495,6 +518,25 @@ class VanityMacGUI:
 
     def clear_patterns(self) -> None:
         self.patterns_text.delete("1.0", END)
+
+    def _drain_ui_queue(self) -> None:
+        """Вычитывает сообщения из фоновых потоков и обновляет UI (main-thread)."""
+        try:
+            while True:
+                kind, payload = self._ui_queue.get_nowait()
+                if kind == "log":
+                    self.log(payload)
+                elif kind == "report":
+                    self.log("\n" + ("=" * 80) + "\n")
+                    self.log("[ANALYZE] report\n")
+                    self.log(("=" * 80) + "\n")
+                    self.log(payload + ("\n" if not payload.endswith("\n") else ""))
+                else:
+                    self.log(f"[UI] unknown message kind: {kind}\n")
+        except queue.Empty:
+            pass
+        # re-arm
+        self.root.after(100, self._drain_ui_queue)
     
     def _update_groups_count(self) -> None:
         """Обновляет счетчик групп в интерфейсе"""
@@ -504,6 +546,30 @@ class VanityMacGUI:
             self.groups_label.config(text=f"Groups: {count}", foreground="blue")
         else:
             self.groups_label.config(text="Groups: 0", foreground="gray")
+
+    def _strip_wildcards_prefix(self, s: str) -> str:
+        """
+        Возвращает "чистый" префикс до первого wildcard-символа.
+        VanitySearch wildcards: '*' и '?'.
+        """
+        s = (s or "").strip()
+        for i, ch in enumerate(s):
+            if ch in ("*", "?"):
+                return s[:i]
+        return s
+
+    def _infer_analysis_source(self) -> tuple[Path, str, str]:
+        """
+        Выводим источник анализа из уже существующих полей GUI:
+        - base_dir: WORKDIR
+        - glob: out_<base>_*.txt (для всех групп)
+        - prefix: берём из поля Prefix (отрезая wildcards)
+        """
+        base_prefix = (self.base_name.get().strip() or "run").replace(" ", "_")
+        base_dir = WORKDIR
+        glob_pattern = f"out_{base_prefix}_*.txt"
+        prefix = self._strip_wildcards_prefix(self.prefix.get())
+        return base_dir, glob_pattern, prefix
 
     def derived_files(self, group_num: int | None = None) -> DerivedFiles:
         base = (self.base_name.get().strip() or "run").replace(" ", "_")
@@ -838,6 +904,41 @@ class VanityMacGUI:
             self.log(f"[OPEN] {WORKDIR}\n")
         except Exception as e:
             self.log(f"[OPEN] failed: {e}\n")
+
+    # ----- Analyzer -----
+    def run_analysis(self) -> None:
+        if not HAS_ANALYZER:
+            self.log(f"[ANALYZE] analyzer module not available: {ANALYZER_IMPORT_ERROR}\n")
+            return
+
+        base_dir, glob_s, prefix_s = self._infer_analysis_source()
+        target_s = (self.target.get() or "").strip()
+        puzzle_bits: int | None = 71
+        suggest_n = 24
+        # ВАЖНО: учитываем suffix, extra patterns (-i), и сегменты, разбитые на группы.
+        search_patterns = self.collect_patterns()
+        seg_groups = self.split_segments_into_groups()
+
+        def worker() -> None:
+            try:
+                report = vs_analyzer.generate_report(
+                    base_dir=base_dir,
+                    glob_pattern=glob_s,
+                    target_address=target_s,
+                    target_prefix=prefix_s,
+                    puzzle_bits=puzzle_bits,
+                    suggest_patterns=suggest_n,
+                    search_patterns=search_patterns,
+                    seg_groups=seg_groups,
+                    verify_crypto=10,
+                )
+            except Exception as e:  # noqa: BLE001
+                report = f"[ANALYZE] failed: {e}\n"
+            # Никаких вызовов tkinter из фонового потока.
+            self._ui_queue.put(("report", report))
+
+        self.log("[ANALYZE] running...\n")
+        threading.Thread(target=worker, daemon=True).start()
 
     def run(self) -> None:
         self.root.mainloop()
