@@ -4,7 +4,7 @@
 # ЦЕЛЬ: 1PWo3JeB9jrGwfHDNpdGK54CRas7fsVzXU (Bitcoin Puzzle #71)
 # ВАЖНО: Предыдущие процессы VanitySearch НЕ останавливаются!
 
-set -euo pipefail
+set -eo pipefail  # Убрали -u чтобы не падать на неопределённых переменных
 
 # Параметры
 SEG_FILE="seg_optimal_120_74_3_74_6.txt"
@@ -54,12 +54,12 @@ if [ ! -f "./VanitySearch" ]; then
 fi
 
 # Проверка существующих процессов (НЕ останавливаем!)
-EXISTING_PROCESSES=$(ps aux | grep '[V]anitySearch' | wc -l)
+EXISTING_PROCESSES=$(ps aux | grep '[V]anitySearch' 2>/dev/null | wc -l || echo "0")
 if [ "$EXISTING_PROCESSES" -gt 0 ]; then
     echo "ℹ️  Найдено $EXISTING_PROCESSES активных процессов VanitySearch"
     echo "   Они продолжат работать параллельно с новым поиском"
     echo ""
-    ps aux | grep '[V]anitySearch' | grep -v grep | head -5
+    ps aux | grep '[V]anitySearch' 2>/dev/null | grep -v grep | head -5 || true
     echo ""
 fi
 
@@ -68,29 +68,72 @@ RESUME_FLAG=""
 if [ -f "$PROGRESS_FILE" ]; then
     echo "ℹ️  Найден файл прогресса, будет использован -resume"
     RESUME_FLAG="-resume"
+else
+    RESUME_FLAG=""  # Явно устанавливаем пустую строку
 fi
 
 echo "✓ Запуск нового GPU поиска (параллельно с существующими)..."
 echo ""
 
 # Запуск с nohup для работы в фоне
-nohup ./VanitySearch \
-    -seg "$SEG_FILE" \
-    -bits $BITS \
-    $RESUME_FLAG \
-    -progress "$PROGRESS_FILE" \
-    -autosave $AUTOSAVE_INTERVAL \
-    -gpu \
-    -gpuId $GPU_ID \
-    -g $GRID \
-    -t $CPU_THREADS \
-    -m $MAXFOUND \
-    -o "$OUT_FILE" \
-    "$PATTERN" \
-    > "$LOG_FILE" 2>&1 &
+# Используем eval для правильной обработки пустого RESUME_FLAG
+if [ -n "$RESUME_FLAG" ]; then
+    nohup ./VanitySearch \
+        -seg "$SEG_FILE" \
+        -bits $BITS \
+        $RESUME_FLAG \
+        -progress "$PROGRESS_FILE" \
+        -autosave $AUTOSAVE_INTERVAL \
+        -gpu \
+        -gpuId $GPU_ID \
+        -g $GRID \
+        -t $CPU_THREADS \
+        -m $MAXFOUND \
+        -o "$OUT_FILE" \
+        "$PATTERN" \
+        > "$LOG_FILE" 2>&1 &
+else
+    nohup ./VanitySearch \
+        -seg "$SEG_FILE" \
+        -bits $BITS \
+        -progress "$PROGRESS_FILE" \
+        -autosave $AUTOSAVE_INTERVAL \
+        -gpu \
+        -gpuId $GPU_ID \
+        -g $GRID \
+        -t $CPU_THREADS \
+        -m $MAXFOUND \
+        -o "$OUT_FILE" \
+        "$PATTERN" \
+        > "$LOG_FILE" 2>&1 &
+fi
 
 PID=$!
-echo "✓ Запущено. PID=$PID"
+sleep 2  # Даём процессу время запуститься
+
+# Проверка, что процесс действительно запустился (универсальная проверка)
+if kill -0 $PID 2>/dev/null || ps aux | grep -q "^[^ ]* *$PID " 2>/dev/null; then
+    echo "✓ Запущено успешно. PID=$PID"
+    echo ""
+    echo "📋 Первые строки лога (проверка запуска):"
+    tail -10 "$LOG_FILE" 2>/dev/null || echo "   (лог ещё пуст или недоступен)"
+    echo ""
+else
+    echo "❌ Ошибка: Процесс не запустился или сразу завершился!"
+    echo ""
+    echo "📋 Содержимое лога (последние 50 строк):"
+    tail -50 "$LOG_FILE" 2>/dev/null || echo "   (лог пуст или недоступен)"
+    echo ""
+    echo "🔍 Возможные причины:"
+    echo "   - Ошибка в параметрах VanitySearch"
+    echo "   - Проблема с GPU (OOM, драйверы, занят другим процессом)"
+    echo "   - Ошибка в файле сегментов"
+    echo "   - Недостаточно памяти"
+    echo ""
+    echo "💡 Попробуйте запустить вручную для диагностики:"
+    echo "   ./VanitySearch -seg $SEG_FILE -bits $BITS -gpu -gpuId $GPU_ID -g $GRID -t $CPU_THREADS -m $MAXFOUND -o $OUT_FILE \"$PATTERN\""
+    exit 1
+fi
 echo ""
 echo "╔════════════════════════════════════════════════════════════════════════════╗"
 echo "║  📊 ПОЛЕЗНЫЕ КОМАНДЫ                                                       ║"
