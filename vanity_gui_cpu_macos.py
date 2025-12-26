@@ -358,7 +358,7 @@ class VanityMacGUI:
         self.suffix = StringVar(value="")
 
         self._proc_lock = threading.Lock()
-        self._proc: subprocess.Popen | None = None
+        self._procs: dict[str, subprocess.Popen] = {}  # base_name -> process
         self._rebuild_thread: threading.Thread | None = None
         self._stop_rebuild = threading.Event()
 
@@ -576,15 +576,17 @@ class VanityMacGUI:
         logf = df.log_file.open("ab")
         try:
             with self._proc_lock:
-                if self._proc and self._proc.poll() is None:
-                    self.log("[START] already running. Use STOP.\n")
+                # Проверяем, запущен ли процесс именно для этого base name
+                existing_proc = self._procs.get(df.base)
+                if existing_proc and existing_proc.poll() is None:
+                    self.log(f"[START] already running for base '{df.base}'. Use STOP.\n")
                     logf.close()
                     return
                 # detach like nohup: start_new_session=True
                 p = subprocess.Popen(args, cwd=str(REPO_ROOT), stdout=logf, stderr=subprocess.STDOUT, start_new_session=True)
-                self._proc = p
+                self._procs[df.base] = p
                 df.pid_file.write_text(str(p.pid), encoding="utf-8")
-            self.log(f"[START] PID={p.pid}\n")
+            self.log(f"[START] PID={p.pid} (base: {df.base})\n")
         except Exception as e:
             logf.close()
             self.log(f"[START] failed: {e}\n")
@@ -613,12 +615,16 @@ class VanityMacGUI:
         subprocess.run(["pkill", "-f", f"VanitySearch.*{df.progress_file.name}"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         with self._proc_lock:
-            if self._proc and self._proc.poll() is None:
+            # Останавливаем процесс для конкретного base name
+            existing_proc = self._procs.get(df.base)
+            if existing_proc and existing_proc.poll() is None:
                 try:
-                    self._proc.terminate()
+                    existing_proc.terminate()
                 except Exception:
                     pass
-            self._proc = None
+            # Удаляем из словаря
+            if df.base in self._procs:
+                del self._procs[df.base]
         self.log("[STOP] done\n")
 
     def show_tail(self) -> None:

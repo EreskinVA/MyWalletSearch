@@ -119,11 +119,20 @@ def parse_seg_file(seg_file):
                 continue
             
             # Формат: abs <start_dec> <end_dec> <up|down> <name> [priority]
+            # Или: key <start_hex> <end_hex> <up|down> <name> [priority]
             parts = line.split()
             if len(parts) >= 5 and parts[0] in ('abs', 'dec', 'key'):
                 try:
-                    start = int(parts[1])
-                    end = int(parts[2])
+                    # Для формата 'key' значения в hex (0x...), для 'abs'/'dec' - десятичные
+                    if parts[0] == 'key':
+                        # Убираем префикс 0x если есть
+                        start_str = parts[1].replace('0x', '').replace('0X', '')
+                        end_str = parts[2].replace('0x', '').replace('0X', '')
+                        start = int(start_str, 16)
+                        end = int(end_str, 16)
+                    else:
+                        start = int(parts[1])
+                        end = int(parts[2])
                     direction = 0 if parts[3].lower() == 'up' else 1
                     name = parts[4]
                     segments[name] = (start, end, direction)
