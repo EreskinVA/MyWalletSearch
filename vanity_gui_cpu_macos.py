@@ -141,13 +141,16 @@ def attach_context_menu(widget, *, allow_edit: bool) -> None:
             if isinstance(widget, Text):
                 widget.tag_add("sel", "1.0", "end")
             else:
+                # Для Entry виджетов
                 widget.select_range(0, "end")
+                widget.icursor("end")
         except Exception:
             pass
 
     menu.add_command(label="Copy", command=do_copy)
-    menu.add_command(label="Cut", command=do_cut)
-    menu.add_command(label="Paste", command=do_paste)
+    if allow_edit:
+        menu.add_command(label="Cut", command=do_cut)
+        menu.add_command(label="Paste", command=do_paste)
     menu.add_separator()
     menu.add_command(label="Select All", command=do_select_all)
 
@@ -158,6 +161,21 @@ def attach_context_menu(widget, *, allow_edit: bool) -> None:
             menu.grab_release()
 
     widget.bind("<Button-3>", popup)  # macOS right click
+    widget.bind("<Button-2>", popup)  # macOS two-finger click
+    
+    # Добавляем поддержку стандартных горячих клавиш macOS
+    if allow_edit:
+        widget.bind("<Command-c>", lambda e: do_copy())
+        widget.bind("<Command-C>", lambda e: do_copy())
+        widget.bind("<Command-x>", lambda e: do_cut())
+        widget.bind("<Command-X>", lambda e: do_cut())
+        widget.bind("<Command-v>", lambda e: do_paste())
+        widget.bind("<Command-V>", lambda e: do_paste())
+    else:
+        widget.bind("<Command-c>", lambda e: do_copy())
+        widget.bind("<Command-C>", lambda e: do_copy())
+    widget.bind("<Command-a>", lambda e: do_select_all())
+    widget.bind("<Command-A>", lambda e: do_select_all())
 
 
 def _cli_prompt(prompt: str, default: str | None = None) -> str:
@@ -378,21 +396,33 @@ class VanityMacGUI:
         row1 = ttk.Frame(top)
         row1.pack(fill=X, pady=(10, 0))
         ttk.Label(row1, text="Base name:").pack(side=LEFT)
-        ttk.Entry(row1, textvariable=self.base_name, width=24).pack(side=LEFT, padx=6)
+        e_base = ttk.Entry(row1, textvariable=self.base_name, width=24)
+        e_base.pack(side=LEFT, padx=6)
+        attach_context_menu(e_base, allow_edit=True)
         ttk.Label(row1, text="bits:").pack(side=LEFT, padx=(18, 0))
-        ttk.Entry(row1, textvariable=self.bits, width=6).pack(side=LEFT, padx=6)
+        e_bits = ttk.Entry(row1, textvariable=self.bits, width=6)
+        e_bits.pack(side=LEFT, padx=6)
+        attach_context_menu(e_bits, allow_edit=True)
         ttk.Label(row1, text="threads (-t):").pack(side=LEFT, padx=(18, 0))
-        ttk.Entry(row1, textvariable=self.threads, width=6).pack(side=LEFT, padx=6)
+        e_threads = ttk.Entry(row1, textvariable=self.threads, width=6)
+        e_threads.pack(side=LEFT, padx=6)
+        attach_context_menu(e_threads, allow_edit=True)
         ttk.Label(row1, text="autosave:").pack(side=LEFT, padx=(18, 0))
-        ttk.Entry(row1, textvariable=self.autosave, width=6).pack(side=LEFT, padx=6)
+        e_autosave = ttk.Entry(row1, textvariable=self.autosave, width=6)
+        e_autosave.pack(side=LEFT, padx=6)
+        attach_context_menu(e_autosave, allow_edit=True)
         ttk.Checkbutton(row1, text="auto -resume", variable=self.auto_resume).pack(side=LEFT, padx=(18, 0))
 
         row2 = ttk.Frame(top)
         row2.pack(fill=X, pady=(8, 0))
         ttk.Label(row2, text="Prefix:").pack(side=LEFT)
-        ttk.Entry(row2, textvariable=self.prefix, width=26).pack(side=LEFT, padx=6)
+        e_prefix = ttk.Entry(row2, textvariable=self.prefix, width=26)
+        e_prefix.pack(side=LEFT, padx=6)
+        attach_context_menu(e_prefix, allow_edit=True)
         ttk.Label(row2, text="Suffix (optional):").pack(side=LEFT, padx=(18, 0))
-        ttk.Entry(row2, textvariable=self.suffix, width=18).pack(side=LEFT, padx=6)
+        e_suffix = ttk.Entry(row2, textvariable=self.suffix, width=18)
+        e_suffix.pack(side=LEFT, padx=6)
+        attach_context_menu(e_suffix, allow_edit=True)
         ttk.Label(row2, text="(prefix*suffix)").pack(side=LEFT)
 
         mid = ttk.Panedwindow(top, orient=HORIZONTAL)
@@ -407,6 +437,8 @@ class VanityMacGUI:
         seg_hdr = ttk.Frame(left)
         seg_hdr.pack(fill=X)
         ttk.Label(seg_hdr, text="Segments (seg-file content):").pack(side=LEFT)
+        self.groups_label = ttk.Label(seg_hdr, text="Groups: 0", foreground="gray")
+        self.groups_label.pack(side=LEFT, padx=10)
         ttk.Button(seg_hdr, text="Load seg...", command=self.load_seg_file).pack(side=RIGHT)
         ttk.Button(seg_hdr, text="Save seg as...", command=self.save_seg_file_as).pack(side=RIGHT, padx=6)
 
@@ -418,7 +450,14 @@ class VanityMacGUI:
             "# Format: abs <start_dec> <end_dec> <up|down> <name> [priority]\n"
             "# Example:\n"
             "# abs 2024714629530360385372 2025206542705659306749 up cpu1 1\n"
+            "#\n"
+            "# Разделите сегменты на группы пустыми строками.\n"
+            "# Каждая группа запустится как отдельный процесс.\n"
         )
+        # Обновляем счетчик групп при изменении текста
+        self.segments_text.bind("<KeyRelease>", lambda e: self._update_groups_count())
+        self.segments_text.bind("<Button-1>", lambda e: self._update_groups_count())
+        self._update_groups_count()
 
         # Patterns editor (optional)
         pat_hdr = ttk.Frame(left)
@@ -456,9 +495,20 @@ class VanityMacGUI:
 
     def clear_patterns(self) -> None:
         self.patterns_text.delete("1.0", END)
+    
+    def _update_groups_count(self) -> None:
+        """Обновляет счетчик групп в интерфейсе"""
+        groups = self.split_segments_into_groups()
+        count = len(groups)
+        if count > 0:
+            self.groups_label.config(text=f"Groups: {count}", foreground="blue")
+        else:
+            self.groups_label.config(text="Groups: 0", foreground="gray")
 
-    def derived_files(self) -> DerivedFiles:
+    def derived_files(self, group_num: int | None = None) -> DerivedFiles:
         base = (self.base_name.get().strip() or "run").replace(" ", "_")
+        if group_num is not None:
+            base = f"{base}_{group_num}"
         WORKDIR.mkdir(parents=True, exist_ok=True)
         return DerivedFiles(
             base=base,
@@ -470,6 +520,35 @@ class VanityMacGUI:
             patterns_file=WORKDIR / f"patterns_{base}.txt",
             pid_file=WORKDIR / f"pid_{base}.txt",
         )
+    
+    def split_segments_into_groups(self) -> list[list[str]]:
+        """Разбивает сегменты на группы по пустым строкам"""
+        txt = self.segments_text.get("1.0", END)
+        lines = txt.splitlines()
+        groups: list[list[str]] = []
+        current_group: list[str] = []
+        
+        for line in lines:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                # Пустая строка или комментарий - если текущая группа не пуста, начинаем новую
+                if current_group:
+                    groups.append(current_group)
+                    current_group = []
+            else:
+                current_group.append(line)
+        
+        # Добавляем последнюю группу, если она не пуста
+        if current_group:
+            groups.append(current_group)
+        
+        # Если групп нет, возвращаем одну группу со всеми непустыми строками
+        if not groups:
+            non_empty = [line for line in lines if line.strip() and not line.strip().startswith("#")]
+            if non_empty:
+                groups.append(non_empty)
+        
+        return groups
 
     def collect_patterns(self) -> list[str]:
         patterns: list[str] = []
@@ -528,9 +607,6 @@ class VanityMacGUI:
         self._rebuild_thread.start()
 
     def start_search(self) -> None:
-        df = self.derived_files()
-        self._write_seg(df)
-
         if not VANITY_BIN.exists():
             self.log(f"[START] Binary not found: {VANITY_BIN}. Run BUILD first.\n")
             return
@@ -540,115 +616,198 @@ class VanityMacGUI:
             self.log("[START] No patterns provided.\n")
             return
 
+        # Разбиваем сегменты на группы
+        groups = self.split_segments_into_groups()
+        if not groups:
+            self.log("[START] No segments found. Add segments to the text area.\n")
+            return
+
+        self.log(f"[START] Found {len(groups)} group(s) of segments\n")
+        
         bits = int(self.bits.get())
         t = int(self.threads.get())
         autosave = int(self.autosave.get())
         m = int(self.maxfound.get())
 
-        resume_flag: list[str] = []
-        if self.auto_resume.get() and df.progress_file.exists():
-            resume_flag = ["-resume"]
+        started_count = 0
+        failed_count = 0
 
-        pattern_args: list[str]
-        if len(patterns) == 1:
-            pattern_args = [patterns[0]]
-        else:
-            df.patterns_file.write_text("\n".join(patterns) + "\n", encoding="utf-8")
-            pattern_args = ["-i", str(df.patterns_file)]
+        for group_num, group_lines in enumerate(groups, start=1):
+            df = self.derived_files(group_num=group_num)
+            
+            # Записываем сегменты для этой группы
+            seg_content = "\n".join(group_lines) + "\n"
+            df.seg_file.write_text(seg_content, encoding="utf-8")
 
-        args = [
-            str(VANITY_BIN),
-            "-seg", str(df.seg_file),
-            "-bits", str(bits),
-            "-t", str(t),
-            "-m", str(m),
-            "-progress", str(df.progress_file),
-            "-autosave", str(autosave),
-            "-o", str(df.out_file),
-            *resume_flag,
-            *pattern_args,
-        ]
+            resume_flag: list[str] = []
+            if self.auto_resume.get() and df.progress_file.exists():
+                resume_flag = ["-resume"]
 
-        self.log(f"[START] seg={df.seg_file.name} progress={df.progress_file.name} out={df.out_file.name} log={df.log_file.name}\n")
-        self.log("[START] cmd:\n  " + " ".join(args) + "\n")
+            pattern_args: list[str]
+            if len(patterns) == 1:
+                pattern_args = [patterns[0]]
+            else:
+                df.patterns_file.write_text("\n".join(patterns) + "\n", encoding="utf-8")
+                pattern_args = ["-i", str(df.patterns_file)]
 
-        df.log_file.parent.mkdir(parents=True, exist_ok=True)
-        logf = df.log_file.open("ab")
-        try:
-            with self._proc_lock:
-                # Проверяем, запущен ли процесс именно для этого base name
-                existing_proc = self._procs.get(df.base)
-                if existing_proc and existing_proc.poll() is None:
-                    self.log(f"[START] already running for base '{df.base}'. Use STOP.\n")
-                    logf.close()
-                    return
-                # detach like nohup: start_new_session=True
-                p = subprocess.Popen(args, cwd=str(REPO_ROOT), stdout=logf, stderr=subprocess.STDOUT, start_new_session=True)
-                self._procs[df.base] = p
-                df.pid_file.write_text(str(p.pid), encoding="utf-8")
-            self.log(f"[START] PID={p.pid} (base: {df.base})\n")
-        except Exception as e:
-            logf.close()
-            self.log(f"[START] failed: {e}\n")
+            args = [
+                str(VANITY_BIN),
+                "-seg", str(df.seg_file),
+                "-bits", str(bits),
+                "-t", str(t),
+                "-m", str(m),
+                "-progress", str(df.progress_file),
+                "-autosave", str(autosave),
+                "-o", str(df.out_file),
+                *resume_flag,
+                *pattern_args,
+            ]
+
+            self.log(f"\n[START Group {group_num}] seg={df.seg_file.name} ({len(group_lines)} segments)\n")
+            self.log(f"[START Group {group_num}] cmd:\n  " + " ".join(args) + "\n")
+
+            df.log_file.parent.mkdir(parents=True, exist_ok=True)
+            logf = df.log_file.open("ab")
+            try:
+                with self._proc_lock:
+                    # Проверяем, запущен ли процесс именно для этого base name
+                    existing_proc = self._procs.get(df.base)
+                    if existing_proc and existing_proc.poll() is None:
+                        self.log(f"[START Group {group_num}] already running for base '{df.base}'. Skipping.\n")
+                        logf.close()
+                        continue
+                    # detach like nohup: start_new_session=True
+                    p = subprocess.Popen(args, cwd=str(REPO_ROOT), stdout=logf, stderr=subprocess.STDOUT, start_new_session=True)
+                    self._procs[df.base] = p
+                    df.pid_file.write_text(str(p.pid), encoding="utf-8")
+                self.log(f"[START Group {group_num}] PID={p.pid} (base: {df.base})\n")
+                started_count += 1
+            except Exception as e:
+                logf.close()
+                self.log(f"[START Group {group_num}] failed: {e}\n")
+                failed_count += 1
+        
+        self.log(f"\n[START] Summary: {started_count} started, {failed_count} failed\n")
 
     def stop_search(self) -> None:
-        df = self.derived_files()
-        pid = None
-        if df.pid_file.exists():
-            try:
-                pid = int(df.pid_file.read_text(encoding="utf-8").strip())
-            except Exception:
-                pid = None
-
-        self.log("[STOP] stopping...\n")
-        # 1) try kill pid
-        if pid:
-            try:
-                os.kill(pid, 15)
-                time.sleep(0.5)
-            except Exception:
-                pass
-
-        # 2) fallback: pkill by our base name artifacts
-        # (matches commands containing seg/prog/out names)
-        subprocess.run(["pkill", "-f", f"VanitySearch.*{df.seg_file.name}"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.run(["pkill", "-f", f"VanitySearch.*{df.progress_file.name}"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-        with self._proc_lock:
-            # Останавливаем процесс для конкретного base name
-            existing_proc = self._procs.get(df.base)
-            if existing_proc and existing_proc.poll() is None:
+        base_prefix = (self.base_name.get().strip() or "run").replace(" ", "_")
+        self.log(f"[STOP] stopping all groups for base '{base_prefix}'...\n")
+        
+        # Находим все группы
+        groups = self.split_segments_into_groups()
+        stopped_count = 0
+        
+        # Останавливаем все группы
+        for group_num in range(1, len(groups) + 1):
+            df = self.derived_files(group_num=group_num)
+            pid = None
+            if df.pid_file.exists():
                 try:
-                    existing_proc.terminate()
+                    pid = int(df.pid_file.read_text(encoding="utf-8").strip())
+                except Exception:
+                    pid = None
+
+            # 1) try kill pid
+            if pid:
+                try:
+                    os.kill(pid, 15)
+                    time.sleep(0.3)
+                    stopped_count += 1
                 except Exception:
                     pass
-            # Удаляем из словаря
-            if df.base in self._procs:
-                del self._procs[df.base]
-        self.log("[STOP] done\n")
+
+            # 2) fallback: pkill by our base name artifacts
+            subprocess.run(["pkill", "-f", f"VanitySearch.*{df.seg_file.name}"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(["pkill", "-f", f"VanitySearch.*{df.progress_file.name}"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+            with self._proc_lock:
+                # Останавливаем процесс для конкретного base name
+                existing_proc = self._procs.get(df.base)
+                if existing_proc and existing_proc.poll() is None:
+                    try:
+                        existing_proc.terminate()
+                        stopped_count += 1
+                    except Exception:
+                        pass
+                # Удаляем из словаря
+                if df.base in self._procs:
+                    del self._procs[df.base]
+        
+        self.log(f"[STOP] done ({stopped_count} processes stopped)\n")
 
     def show_tail(self) -> None:
-        df = self.derived_files()
+        base_prefix = (self.base_name.get().strip() or "run").replace(" ", "_")
+        groups = self.split_segments_into_groups()
         n = int(self.tail_n.get())
-        self.log(f"\n[TAIL] {df.log_file.name} (last {n})\n")
-        self.log(tail_lines(df.log_file, n) + "\n")
+        
+        if not groups:
+            self.log(f"\n[TAIL] No groups found\n")
+            return
+        
+        self.log(f"\n[TAIL] Showing last {n} lines from all groups:\n")
+        self.log("=" * 80 + "\n")
+        
+        for group_num in range(1, len(groups) + 1):
+            df = self.derived_files(group_num=group_num)
+            if df.log_file.exists():
+                self.log(f"\n--- Group {group_num} ({df.log_file.name}) ---\n")
+                self.log(tail_lines(df.log_file, n) + "\n")
+            else:
+                self.log(f"\n--- Group {group_num} ({df.log_file.name}) ---\n")
+                self.log("[LOG FILE NOT FOUND]\n")
+        
+        self.log("=" * 80 + "\n")
 
     def show_progress(self) -> None:
-        df = self.derived_files()
+        base_prefix = (self.base_name.get().strip() or "run").replace(" ", "_")
+        groups = self.split_segments_into_groups()
+        
         if not SHOW_PROGRESS_PY.exists():
             self.log(f"[PROGRESS] not found: {SHOW_PROGRESS_PY}\n")
             return
-        if not df.seg_file.exists():
-            self.log(f"[PROGRESS] seg not found: {df.seg_file}\n")
+        
+        if not groups:
+            self.log(f"\n[PROGRESS] No groups found\n")
             return
-        if not df.progress_file.exists():
-            self.log(f"[PROGRESS] progress not found: {df.progress_file}\n")
-            return
-
+        
+        self.log(f"\n[PROGRESS] Showing progress for all {len(groups)} group(s):\n")
+        self.log("=" * 120 + "\n")
+        
         py = sys.executable
-        rc, out = run_capture([py, str(SHOW_PROGRESS_PY), str(df.seg_file), str(df.progress_file), str(df.out_file)], cwd=REPO_ROOT)
-        self.log(f"\n[PROGRESS] rc={rc}\n")
-        self.log(out + "\n")
+        total_found = 0
+        total_checked = 0
+        
+        for group_num in range(1, len(groups) + 1):
+            df = self.derived_files(group_num=group_num)
+            
+            if not df.seg_file.exists():
+                self.log(f"\n--- Group {group_num} ---\n")
+                self.log(f"[PROGRESS] seg not found: {df.seg_file}\n")
+                continue
+            if not df.progress_file.exists():
+                self.log(f"\n--- Group {group_num} ---\n")
+                self.log(f"[PROGRESS] progress not found: {df.progress_file}\n")
+                continue
+
+            self.log(f"\n{'=' * 120}\n")
+            self.log(f"GROUP {group_num} ({df.base})\n")
+            self.log(f"{'=' * 120}\n")
+            
+            rc, out = run_capture([py, str(SHOW_PROGRESS_PY), str(df.seg_file), str(df.progress_file), str(df.out_file)], cwd=REPO_ROOT)
+            self.log(out + "\n")
+            
+            # Парсим найденные из вывода (если есть)
+            if "Найдено:" in out:
+                try:
+                    found_line = [l for l in out.splitlines() if "Найдено:" in l][0]
+                    found_num = int(found_line.split("Найдено:")[1].split()[0])
+                    total_found += found_num
+                except Exception:
+                    pass
+        
+        self.log(f"\n{'=' * 120}\n")
+        self.log(f"SUMMARY: Total found across all groups: {total_found}\n")
+        self.log(f"{'=' * 120}\n")
 
     def load_seg_file(self) -> None:
         p = filedialog.askopenfilename(title="Select seg file", initialdir=str(REPO_ROOT))
@@ -660,6 +819,7 @@ class VanityMacGUI:
             txt = Path(p).read_text(errors="ignore")
         self.segments_text.delete("1.0", END)
         self.segments_text.insert("1.0", txt)
+        self._update_groups_count()
         self.log(f"[SEG] loaded: {p}\n")
 
     def save_seg_file_as(self) -> None:
