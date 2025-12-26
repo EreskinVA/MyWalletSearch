@@ -81,3 +81,4 @@ echo "✓ Завершено. Проверьте результаты:"
 echo "  Найденные: cat $OUT_FILE"
 echo "  Лог: tail -20 $LOG_FILE"
 
+

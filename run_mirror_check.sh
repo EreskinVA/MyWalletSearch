@@ -74,3 +74,4 @@ echo "✓ Завершено. Проверьте результаты:"
 echo "  Найденные: cat $OUT_FILE"
 echo "  Лог: tail -30 $LOG_FILE"
 
+

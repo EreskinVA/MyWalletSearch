@@ -151,3 +151,4 @@ OUT_FILES="out_cpu_p1.txt out_cpu_p2.txt out_cpu_p3.txt"
 OUT_FILES="ваш_файл1.txt ваш_файл2.txt"
 ```
 
+
