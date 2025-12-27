@@ -596,7 +596,7 @@ class VanityMacGUI:
         
         for line in lines:
             stripped = line.strip()
-            if not stripped or stripped.startswith("#"):
+            if not stripped or stripped.startswith("#") or stripped.startswith(";"):
                 # Пустая строка или комментарий - если текущая группа не пуста, начинаем новую
                 if current_group:
                     groups.append(current_group)
@@ -610,7 +610,13 @@ class VanityMacGUI:
         
         # Если групп нет, возвращаем одну группу со всеми непустыми строками
         if not groups:
-            non_empty = [line for line in lines if line.strip() and not line.strip().startswith("#")]
+            non_empty = [
+                line
+                for line in lines
+                if line.strip()
+                and not line.strip().startswith("#")
+                and not line.strip().startswith(";")
+            ]
             if non_empty:
                 groups.append(non_empty)
         
@@ -630,7 +636,7 @@ class VanityMacGUI:
         # extra patterns
         for line in self.patterns_text.get("1.0", END).splitlines():
             line = (line or "").strip()
-            if not line or line.startswith("#"):
+            if not line or line.startswith("#") or line.startswith(";"):
                 continue
             if len(line) >= 2 and line[0] == line[-1] and line[0] in ("'", '"'):
                 line = line[1:-1].strip()
