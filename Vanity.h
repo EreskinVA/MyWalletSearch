@@ -166,6 +166,12 @@ private:
   // Позиционные маски для каждого паттерна
   std::vector<POSITIONAL_MASK> positionalMasks;
 
+  // GPU wildcard filter pattern:
+  // GPUEngine currently supports only ONE wildcard pattern on GPU.
+  // When user provides many patterns (-i), we choose a "superset" filter for GPU (e.g. commonPrefix + "*"),
+  // and still validate all patterns on CPU for each GPU candidate.
+  std::string gpuPattern;
+
   Int beta;
   Int lambda;
   Int beta2;

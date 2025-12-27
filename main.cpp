@@ -155,13 +155,22 @@ void parseFile(string fileName, vector<string> &lines) {
       l--;
     }
 
-    if (line.length() > 0) {
-      lines.push_back(line);
-      nbLine++;
-      if (loaddingProgress) {
-        if ((nbLine % 50000) == 0)
-          printf("[Loading input file %5.1f%%]\r", ((double)nbLine*100.0) / ((double)(nbAddr)*33.0 / 34.0));
-      }
+    // Remove leading spaces (so that "  # comment" is treated as comment)
+    size_t start = 0;
+    while (start < line.size() && isspace((unsigned char)line[start])) start++;
+    if (start > 0) line.erase(0, start);
+
+    // Skip empty lines and comments. For -i patterns file it is convenient to allow:
+    //   # comment
+    //   ; comment
+    if (line.empty()) continue;
+    if (line[0] == '#' || line[0] == ';') continue;
+
+    lines.push_back(line);
+    nbLine++;
+    if (loaddingProgress) {
+      if ((nbLine % 50000) == 0)
+        printf("[Loading input file %5.1f%%]\r", ((double)nbLine*100.0) / ((double)(nbAddr)*33.0 / 34.0));
     }
 
   }

@@ -49,6 +49,73 @@ Point _2Gn;
 
 // ----------------------------------------------------------------------------
 
+static bool HasWildcardChars(const std::string &s) {
+  return (s.find('*') != std::string::npos) || (s.find('?') != std::string::npos);
+}
+
+static std::string FixedPrefixUntilWildcard(const std::string &s) {
+  size_t pStar = s.find('*');
+  size_t pQ = s.find('?');
+  size_t cut = std::string::npos;
+  if (pStar != std::string::npos) cut = pStar;
+  if (pQ != std::string::npos) cut = (cut == std::string::npos ? pQ : std::min(cut, pQ));
+  if (cut == std::string::npos) return s;
+  return s.substr(0, cut);
+}
+
+static std::string LongestCommonPrefix(const std::vector<std::string> &v) {
+  if (v.empty()) return "";
+  std::string p = v[0];
+  for (size_t i = 1; i < v.size() && !p.empty(); i++) {
+    const std::string &s = v[i];
+    size_t j = 0;
+    size_t n = std::min(p.size(), s.size());
+    while (j < n && p[j] == s[j]) j++;
+    p.resize(j);
+  }
+  return p;
+}
+
+static std::string ChooseGpuWildcardFilterPattern(const std::vector<std::string> &patterns) {
+  // Strategy:
+  // - Build fixed prefixes (until first '*' or '?')
+  // - Take LCP as a superset filter and append '*'
+  // - If too short, fallback to first wildcard pattern, else to first pattern.
+  auto ensureStar = [](const std::string &p) -> std::string {
+    if (p.empty()) return p;
+    if (p.find('*') != std::string::npos) return p; // already can match arbitrary tail
+    // GPU wildcard matcher expects full-string match; without '*' a short pattern never matches 34-char address.
+    // Поэтому всегда делаем prefix* фильтр.
+    return p + "*";
+  };
+
+  // Build fixed prefixes (until first '*' or '?'), but also guard against "plain prefix" lines (no wildcard).
+  // Such lines are valid for CPU (fast prefix-table path), but in wildcard GPU mode they would match nothing.
+  std::vector<std::string> fixed;
+  fixed.reserve(patterns.size());
+  for (const auto &p0 : patterns) {
+    if (p0.empty()) continue;
+    // treat "plain" patterns as prefix filters for GPU
+    std::string p = ensureStar(p0);
+    fixed.push_back(FixedPrefixUntilWildcard(p));
+  }
+
+  std::string lcp = LongestCommonPrefix(fixed);
+  if (lcp.size() >= 4) {
+    return lcp + "*";
+  }
+
+  // Fallback: first pattern, but make it safe for GPU (must end with '*')
+  for (const auto &p0 : patterns) {
+    if (p0.empty()) continue;
+    if (HasWildcardChars(p0)) return ensureStar(p0);
+  }
+  for (const auto &p0 : patterns) {
+    if (!p0.empty()) return ensureStar(p0);
+  }
+  return std::string();
+}
+
 VanitySearch::VanitySearch(Secp256K1 *secp, vector<std::string> &inputPrefixes,string seed,int searchMode,
                            bool useGpu, bool stop, string outputFile, bool useSSE, uint32_t maxFound,
                            uint64_t rekey, bool caseSensitive, Point &startPubKey, bool paranoiacSeed,
@@ -69,6 +136,7 @@ VanitySearch::VanitySearch(Secp256K1 *secp, vector<std::string> &inputPrefixes,s
   this->searchType = -1;
   this->startPubKey = startPubKey;
   this->hasPattern = false;
+  this->gpuPattern = "";
   this->caseSensitive = caseSensitive;
   this->startPubKeySpecified = !startPubKey.isZero();
   this->useSegmentSearch = useSegments;
@@ -146,6 +214,21 @@ VanitySearch::VanitySearch(Secp256K1 *secp, vector<std::string> &inputPrefixes,s
     if (mask.isValid) {
       printf("[PositionalMask] Паттерн %d: найдено %zu фиксированных позиций\n", 
              i, mask.fixedPositions.size());
+    }
+  }
+
+  // IMPORTANT (GPU + wildcard):
+  // GPUEngine supports only ONE wildcard pattern on GPU. If user provides many patterns (-i),
+  // picking inputPrefixes[0] is fragile (can lead to Found=0 forever). We compute a safe superset filter.
+  if (hasPattern) {
+    gpuPattern = ChooseGpuWildcardFilterPattern(inputPrefixes);
+    if (!gpuPattern.empty()) {
+      printf("[GPU] Wildcard filter pattern: %s (CPU проверит все %zu паттернов)\n",
+             gpuPattern.c_str(), inputPrefixes.size());
+      if (gpuPattern.size() <= 5) {
+        printf("[GPU] Warning: wildcard filter is very broad (len=%zu). Consider splitting patterns into multiple runs.\n",
+               gpuPattern.size());
+      }
     }
   }
 
@@ -2117,7 +2200,15 @@ void VanitySearch::FindKeyGPU(TH_PARAM *ph) {
   // IMPORTANT: if hasPattern==true we MUST use pattern matching on GPU regardless of `onlyFull`.
   // Calling SetPrefix() here breaks wildcard searches (and triggers "Wrong totalPrefix").
   if (hasPattern) {
-    g.SetPattern(inputPrefixes[0].c_str());
+    const char *pat = NULL;
+    if (!gpuPattern.empty()) {
+      pat = gpuPattern.c_str();
+    } else if (!inputPrefixes.empty()) {
+      pat = inputPrefixes[0].c_str();
+    }
+    if (pat != NULL) {
+      g.SetPattern(pat);
+    }
   } else if (onlyFull) {
     g.SetPrefix(usedPrefixL, nbPrefix);
   } else {

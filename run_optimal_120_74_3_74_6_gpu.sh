@@ -64,12 +64,33 @@ if [ ! -s "$PATTERNS_FILE_CLEAN" ]; then
     exit 1
 fi
 
+# ВАЖНО (GPU + wildcard):
+# В текущей реализации GPU-ядро использует ТОЛЬКО ПЕРВЫЙ паттерн из списка (-i),
+# поэтому первый паттерн должен быть "широким фильтром", а все остальные — его подмножеством.
+# Здесь принудительно делаем первым паттерном "${PATTERN}*" (поиск по префиксу),
+# чтобы GPU начал возвращать кандидаты, а CPU уже проверит остальные строки из -i.
+PATTERNS_FILE_GPU="${PATTERNS_FILE}.gpu"
+{
+  echo "${PATTERN}*"
+  # добавляем остальные паттерны, кроме точного "${PATTERN}" (он в wildcard-режиме = полное совпадение строки и всегда 0)
+  grep -v -x "${PATTERN}" "$PATTERNS_FILE_CLEAN" || true
+} | awk '!seen[$0]++' > "$PATTERNS_FILE_GPU"
+if [ ! -s "$PATTERNS_FILE_GPU" ]; then
+    echo "❌ Ошибка: итоговый файл паттернов для GPU пустой: $PATTERNS_FILE_GPU"
+    exit 1
+fi
+
 # Проверка VanitySearch
 if [ ! -f "./VanitySearch" ]; then
     echo "❌ Ошибка: VanitySearch не найден!"
     echo "   Соберите проект: make clean && make gpu=1 CCAP=8.9 all -j\"\$(nproc)\""
     exit 1
 fi
+
+# Проверка, что можем писать out/log/progress в текущую директорию
+touch "$OUT_FILE" 2>/dev/null || { echo "❌ Нет прав создать/писать OUT_FILE=$OUT_FILE (проверьте папку запуска)"; exit 1; }
+touch "$LOG_FILE" 2>/dev/null || { echo "❌ Нет прав создать/писать LOG_FILE=$LOG_FILE (проверьте папку запуска)"; exit 1; }
+touch "$PROGRESS_FILE" 2>/dev/null || { echo "❌ Нет прав создать/писать PROGRESS_FILE=$PROGRESS_FILE (проверьте папку запуска)"; exit 1; }
 
 # Проверка существующих процессов (НЕ останавливаем!)
 EXISTING_PROCESSES=$(ps aux | grep '[V]anitySearch' 2>/dev/null | wc -l || echo "0")
@@ -108,7 +129,7 @@ if [ -n "$RESUME_FLAG" ]; then
         -t $CPU_THREADS \
         -m $MAXFOUND \
         -o "$OUT_FILE" \
-        -i "$PATTERNS_FILE_CLEAN" \
+        -i "$PATTERNS_FILE_GPU" \
         "$PATTERN" \
         > "$LOG_FILE" 2>&1 &
 else
@@ -123,7 +144,7 @@ else
         -t $CPU_THREADS \
         -m $MAXFOUND \
         -o "$OUT_FILE" \
-        -i "$PATTERNS_FILE_CLEAN" \
+        -i "$PATTERNS_FILE_GPU" \
         "$PATTERN" \
         > "$LOG_FILE" 2>&1 &
 fi
