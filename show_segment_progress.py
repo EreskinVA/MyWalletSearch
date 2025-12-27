@@ -106,8 +106,36 @@ def parse_hex_to_int(hex_str):
     except:
         return None
 
-def parse_seg_file(seg_file):
-    """Парсит seg файл и возвращает словарь сегментов {name: (start, end, direction)}"""
+def _calc_key_at_percent(bit_range: int, percent: float) -> int:
+    """
+    Аналог SegmentSearch::CalculateKeyAtPercent + clamp.
+    Для puzzle bits=N: полный диапазон [2^(N-1) .. 2^N - 1].
+    percent задаётся в 0..100.
+    """
+    if bit_range <= 0:
+        raise ValueError("bit_range must be > 0")
+    # fullRangeStart = 2^(bits-1)
+    start = 1 << (bit_range - 1)
+    # fullRangeEnd = 2^bits - 1
+    end = (1 << bit_range) - 1
+    size = end - start + 1
+    # integer math like in C++ (floor)
+    offset = int(size * (percent / 100.0))
+    k = start + offset
+    if k < start:
+        k = start
+    if k > end:
+        k = end
+    return k
+
+
+def parse_seg_file(seg_file: str, bit_range: int | None = None):
+    """Парсит seg файл и возвращает словарь сегментов {name: (start, end, direction)}.
+
+    Поддерживаемые форматы:
+      - abs/dec/key: как раньше
+      - pct/percent: проценты 0..100 (требует bit_range для вычисления abs-границ)
+    """
     segments = {}
     if not os.path.exists(seg_file):
         return segments
@@ -118,10 +146,12 @@ def parse_seg_file(seg_file):
             if not line or line.startswith('#'):
                 continue
             
-            # Формат: abs <start_dec> <end_dec> <up|down> <name> [priority]
-            # Или: key <start_hex> <end_hex> <up|down> <name> [priority]
+            # Формат:
+            #   abs <start_dec> <end_dec> <up|down> <name> [priority]
+            #   key <start_hex> <end_hex> <up|down> <name> [priority]
+            #   pct <startPercent> <endPercent> <up|down> <name> [priority]
             parts = line.split()
-            if len(parts) >= 5 and parts[0] in ('abs', 'dec', 'key'):
+            if len(parts) >= 5 and parts[0] in ('abs', 'dec', 'key', 'pct', 'percent'):
                 try:
                     # Для формата 'key' значения в hex (0x...), для 'abs'/'dec' - десятичные
                     if parts[0] == 'key':
@@ -130,6 +160,15 @@ def parse_seg_file(seg_file):
                         end_str = parts[2].replace('0x', '').replace('0X', '')
                         start = int(start_str, 16)
                         end = int(end_str, 16)
+                    elif parts[0] in ('pct', 'percent'):
+                        if bit_range is None or bit_range <= 0:
+                            # Без bit_range невозможно корректно посчитать abs-границы.
+                            # Вернём пусто — main() выведет понятную ошибку.
+                            return {}
+                        sp = float(parts[1])
+                        ep = float(parts[2])
+                        start = _calc_key_at_percent(bit_range, sp)
+                        end = _calc_key_at_percent(bit_range, ep)
                     else:
                         start = int(parts[1])
                         end = int(parts[2])
@@ -276,18 +315,19 @@ def main():
     out_file = sys.argv[3] if len(sys.argv) > 3 else ''
     if not out_file:
         out_file = infer_out_file(progress_file)
-    
-    # Парсим конфигурацию сегментов
-    seg_config = parse_seg_file(seg_file)
-    if not seg_config:
-        print(f"Ошибка: не удалось загрузить конфигурацию из {seg_file}")
-        sys.exit(1)
-    
-    # Парсим прогресс
+
+    # Парсим прогресс (раньше конфиг читался первым, но для pct-сегментов нужен BitRange из прогресса)
     progress = parse_progress_file(progress_file)
     if not progress:
         print(f"Ошибка: не удалось загрузить прогресс из {progress_file}")
         print("Убедитесь что поиск запущен с параметром -progress")
+        sys.exit(1)
+
+    # Парсим конфигурацию сегментов
+    seg_config = parse_seg_file(seg_file, bit_range=progress.get('bitRange', 0))
+    if not seg_config:
+        print(f"Ошибка: не удалось загрузить конфигурацию из {seg_file}")
+        print("Примечание: для pct/percent сегментов нужен BitRange из progress-файла.")
         sys.exit(1)
     
     # Заголовок
