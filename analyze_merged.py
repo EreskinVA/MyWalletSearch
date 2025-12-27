@@ -1307,7 +1307,7 @@ def analyze_results(cfg: AnalyzerConfig) -> dict[str, Any]:
     # используем те, что уже сформированы
     cand_patterns.extend(_build_target_pattern_pack(target, base_prefix=prefix, max_items=32))
     # signal packs (из cond_by_prefix)
-    focus_prefix = "1PWo3Je"
+    focus_prefix = "1PWo3JeB"
     cand_patterns.extend(_build_signal_pattern_pack_high_prob(cond_by_prefix, focus_prefix=focus_prefix, p_min=0.05, max_items=32))
     cand_patterns.extend(_build_signal_pattern_pack_long_first(cond_by_prefix, focus_prefix=focus_prefix, max_items=32))
     cand_patterns = _dedup_keep_order(cand_patterns)
@@ -2123,7 +2123,7 @@ def render_report(analysis: dict[str, Any]) -> str:
     target = analysis.get("target") or ""
     cond_by_prefix = analysis.get("cond_by_prefix") or {}
     base_prefix = analysis.get("prefix") or ""
-    focus_prefix = "1PWo3Je"  # стабильный базовый префикс для статистики (шире, чем 1PWo3JeB)
+    focus_prefix = "1PWo3JeB"  # стабильный базовый префикс для статистики (шире, чем 1PWo3JeB9)
 
     target_pack = _build_target_pattern_pack(target, base_prefix=base_prefix, max_items=32)
     signal_pack_long = _build_signal_pattern_pack_long_first(cond_by_prefix, focus_prefix=focus_prefix, max_items=64)
