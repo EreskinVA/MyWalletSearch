@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import math
+import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,6 +25,9 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 BASE58_N = len(BASE58_ALPHABET)
+
+# Segment names in out files may contain suffix like "name (#5)". Normalize to match GUI segment names.
+_SEG_SUFFIX_RE = re.compile(r"\s*\(#\d+\)\s*$")
 
 # --- secp256k1 (для крипто-проверки соответствия Priv/PuzzleKeyAbs -> PubAddress) ---
 SECP_P = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F
@@ -220,7 +224,7 @@ def parse_result_file(filepath: Path) -> list[dict[str, str]]:
             elif k == "SegKey (DEC)":
                 current["seg_key"] = v
             elif k == "Segment":
-                current["segment"] = v
+                current["segment"] = _SEG_SUFFIX_RE.sub("", v).strip()
             elif k == "SegmentDir":
                 current["segment_dir"] = v
             elif k == "SegmentOffset (DEC)":
@@ -939,6 +943,13 @@ def analyze_results(cfg: AnalyzerConfig) -> dict[str, Any]:
     all_results, file_stats, files = load_results(cfg)
     addresses = [r.get("address", "") for r in all_results if r.get("address")]
 
+    # Puzzle range helpers (если включён puzzle_bits)
+    puzzle_start_rng: Optional[int] = None
+    puzzle_end_rng: Optional[int] = None
+    if isinstance(cfg.puzzle_bits, int) and cfg.puzzle_bits > 0:
+        puzzle_start_rng = 2 ** (cfg.puzzle_bits - 1)
+        puzzle_end_rng = 2**cfg.puzzle_bits - 1
+
     # Дубликаты по файлам (чтобы понять, это "реальные повторы" или повторная запись/пересечения сегментов)
     addr_files: dict[str, set[str]] = defaultdict(set)
     for r in all_results:
@@ -1078,12 +1089,23 @@ def analyze_results(cfg: AnalyzerConfig) -> dict[str, Any]:
         cond_by_prefix[pfx] = d
 
     pct_list: list[tuple[str, float, str]] = []
-    puzzle_integrity: dict[str, int] = {"checked": 0, "ok_in_range": 0, "ok_start_pos0_abs": 0, "ok_hex_dec": 0}
+    puzzle_integrity: dict[str, Any] = {
+        "checked": 0,
+        "ok_in_range": 0,
+        "ok_start_pos0_abs": 0,
+        "ok_hex_dec": 0,
+        "bad_samples": [],
+    }
     if cfg.puzzle_bits is not None:
         for r in all_results:
             ka = r.get("puzzle_key_abs")
             if not ka:
                 continue
+            # фильтруем выбросы вне диапазона (они бывают из-за boundary effects в сегментном переборе)
+            if puzzle_start_rng is not None and puzzle_end_rng is not None:
+                ka_i = _safe_int(ka)
+                if ka_i is None or not (puzzle_start_rng <= ka_i <= puzzle_end_rng):
+                    continue
             pct = _calc_puzzle_percentage(ka, cfg.puzzle_bits)
             if pct is None:
                 continue
@@ -1104,20 +1126,39 @@ def analyze_results(cfg: AnalyzerConfig) -> dict[str, Any]:
             if ka_dec is None:
                 continue
             puzzle_integrity["checked"] += 1
-            if start_rng <= ka_dec <= end_rng:
+            in_range = (start_rng <= ka_dec <= end_rng)
+            if in_range:
                 puzzle_integrity["ok_in_range"] += 1
             ps = _safe_int(r.get("puzzle_start_dec", ""))
             p0 = _safe_int(r.get("puzzle_pos0", ""))
-            if ps is not None and p0 is not None and (ps + p0 == ka_dec):
+            ok_sum = (ps is not None and p0 is not None and (ps + p0 == ka_dec))
+            if ok_sum:
                 puzzle_integrity["ok_start_pos0_abs"] += 1
             hx = (r.get("puzzle_key_abs_hex") or "").strip()
+            ok_hex = False
             if hx:
                 try:
                     hxv = int(hx.lower().replace("0x", ""), 16)
                     if hxv == ka_dec:
                         puzzle_integrity["ok_hex_dec"] += 1
+                        ok_hex = True
                 except Exception:
                     pass
+            # record anomalies (first few)
+            if (not in_range) or (not ok_sum) or (hx and not ok_hex):
+                if len(puzzle_integrity["bad_samples"]) < 8:
+                    puzzle_integrity["bad_samples"].append(
+                        {
+                            "file": r.get("file"),
+                            "addr": r.get("address"),
+                            "seg": r.get("segment"),
+                            "ka_dec": ka_dec_s,
+                            "ka_hex": r.get("puzzle_key_abs_hex"),
+                            "pbits": r.get("puzzle_bits"),
+                            "pstart": r.get("puzzle_start_dec"),
+                            "pos0": r.get("puzzle_pos0"),
+                        }
+                    )
 
     # Крипто-проверка: какой именно scalar соответствует PubAddress
     crypto_verify: dict[str, Any] = {"checked": 0, "match_priv": 0, "match_puzzle": 0, "match_seg": 0, "mismatch": 0, "samples": []}
@@ -1198,6 +1239,10 @@ def analyze_results(cfg: AnalyzerConfig) -> dict[str, Any]:
             seg_int = _safe_int(r.get("puzzle_key_abs", ""))
         if seg_int is None:
             continue
+        # если задан puzzle_bits, ограничиваем bit-аналитику тем же диапазоном (иначе 1 выброс ломает окно/биты)
+        if puzzle_start_rng is not None and puzzle_end_rng is not None:
+            if not (puzzle_start_rng <= seg_int <= puzzle_end_rng):
+                continue
         segkeys.append(seg_int)
         if r.get("address"):
             segkey_by_addr[r["address"]] = seg_int
@@ -1565,6 +1610,12 @@ def render_report(analysis: dict[str, Any]) -> str:
         lines.append(f"in_range(bits):         {pi['ok_in_range']}/{pi['checked']}")
         lines.append(f"PuzzleStart+Pos0==Abs:  {pi['ok_start_pos0_abs']}/{pi['checked']}")
         lines.append(f"HEX==DEC:               {pi['ok_hex_dec']}/{pi['checked']}")
+        if pi.get("bad_samples"):
+            lines.append("Аномалии (первые):")
+            for s in pi["bad_samples"]:
+                lines.append(f"  - file={s.get('file')} seg={s.get('seg')} addr={s.get('addr')}")
+                lines.append(f"    PuzzleBits={s.get('pbits')}  PuzzleStart={s.get('pstart')}  Pos0={s.get('pos0')}")
+                lines.append(f"    AbsDec={s.get('ka_dec')}  AbsHex={s.get('ka_hex')}")
         lines.append("")
 
     cv = analysis.get("crypto_verify") or {}

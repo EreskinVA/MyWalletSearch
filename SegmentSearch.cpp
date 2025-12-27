@@ -616,11 +616,37 @@ bool SegmentSearch::GetStartingKey(int threadId, Int &key) {
   
   // Добавляем небольшое смещение для потока, чтобы потоки не искали в одном месте.
   // Для DOWN смещение должно идти "вниз", иначе мы улетим за верхнюю границу.
-  Int offset((int64_t)threadId);
+  //
+  // ВАЖНО (GPU): threadId может быть очень большим (globalThreadId), и прямое смещение на threadId
+  // способно увести стартовый ключ далеко за пределы сегмента/битового диапазона.
+  // Поэтому:
+  // - ограничиваем смещение небольшим модулем (чтобы избежать коллизий, но не "улетать")
+  // - после смещения клампим ключ в границы сегмента и полного диапазона (если инициализирован).
+  uint64_t smallOff = (uint64_t)((threadId < 0) ? -(int64_t)threadId : (int64_t)threadId);
+  smallOff = smallOff % 1024ULL; // "малое" смещение, совместимо с GRP_SIZE/CPU_GRP_SIZE по умолчанию
+  Int offset((uint64_t)smallOff);
   if (seg.direction == DIRECTION_UP) {
     key.Add(&offset);
   } else {
     key.Sub(&offset);
+  }
+
+  // Clamp to segment range [min(rangeStart, rangeEnd) .. max(rangeStart, rangeEnd)]
+  {
+    Int a(&seg.rangeStart);
+    Int b(&seg.rangeEnd);
+    Int mn(&a);
+    Int mx(&a);
+    if (b.IsLower(&mn)) mn.Set(&b);
+    if (b.IsGreater(&mx)) mx.Set(&b);
+    if (key.IsLower(&mn)) key.Set(&mn);
+    if (key.IsGreater(&mx)) key.Set(&mx);
+  }
+
+  // Clamp to full puzzle range if initialized (bitRange > 0)
+  if (bitRange > 0) {
+    if (key.IsLower(&fullRangeStart)) key.Set(&fullRangeStart);
+    if (key.IsGreater(&fullRangeEnd)) key.Set(&fullRangeEnd);
   }
   
 #ifndef WIN64
