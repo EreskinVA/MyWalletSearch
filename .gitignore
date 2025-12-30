@@ -40,6 +40,20 @@ kangaroo*.dat
 results*.txt
 RESULTS*.txt
 
+# Runtime output dirs / artifacts (server + local runs)
+runs_cpu_gui/
+server_results/
+
+# Output / progress files (часто содержат приватные ключи / промежуточные данные)
+out_*.txt
+out*.txt
+progress_*.dat
+
+# Address dumps / merged outputs (обычно большие и генерируются заново)
+*.addr
+merged_out*.txt
+puzzle*_solution_table*.csv
+
 # Large test files
 *.bin
 *.dump
