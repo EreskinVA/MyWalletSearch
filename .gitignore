@@ -44,6 +44,12 @@ RESULTS*.txt
 runs_cpu_gui/
 server_results/
 
+# Local analysis reports (обычно локальные артефакты)
+ANALYZE*.txt
+
+# Local segment presets (обычно локальные/временные)
+seg_local_*.txt
+
 # Output / progress files (часто содержат приватные ключи / промежуточные данные)
 out_*.txt
 out*.txt
