@@ -77,6 +77,57 @@ VanitySearch использует оптимизации (эндоморфизм
 
 Ниже — “правильные” команды для Windows 10/11 + NVIDIA.
 
+### 0.0 Git на Windows: `CRYPT_E_REVOCATION_OFFLINE (0x80092013)` при `git push`
+
+Если при пуше/фетче видите:
+`schannel: next InitializeSecurityContext failed: CRYPT_E_REVOCATION_OFFLINE (0x80092013)`
+
+Это означает: Windows (Schannel) не смогла проверить отзыв TLS-сертификата (CRL/OCSP), потому что доступ к серверам проверки недоступен
+(часто из-за прокси/VPN/антивируса/корпоративной сети/фильтрации).
+
+**Шаг 1 (часто достаточно): отключить проверку отзыва сертификатов в Git(Schannel)**:
+
+```powershell
+git config --global http.schannelCheckRevoke false
+git push
+```
+
+**Шаг 2: проверьте, что `origin` без лишнего `/` в конце** (частая мелочь, которая мешает диагностике):
+
+```powershell
+git remote -v
+git remote set-url origin https://github.com/EreskinVA/MyWalletSearch.git
+git push
+```
+
+**Шаг 3 (альтернатива): переключить TLS backend на OpenSSL** (иногда помогает лучше Schannel):
+
+```powershell
+git config --global http.sslBackend openssl
+git push
+```
+
+**Вернуть всё обратно (рекомендуется после починки сети/прокси):**
+
+```powershell
+git config --global --unset http.schannelCheckRevoke
+git config --global --unset http.sslBackend
+```
+
+**Если вы за прокси:** проверьте настройки прокси в Git (неверные значения ломают TLS/CRL):
+
+```powershell
+git config --global --get http.proxy
+git config --global --get https.proxy
+```
+
+Удалить (если не используете прокси):
+
+```powershell
+git config --global --unset http.proxy
+git config --global --unset https.proxy
+```
+
 ### 0.1 Быстрая проверка GPU и Compute Capability
 
 В PowerShell:
