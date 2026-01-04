@@ -23,23 +23,35 @@ import sys
 import time
 import threading
 import subprocess
+import queue
 from dataclasses import dataclass
 from pathlib import Path
 from tkinter import Tk, ttk, StringVar, IntVar, BooleanVar, Text, END, BOTH, LEFT, RIGHT, X, Y, VERTICAL, HORIZONTAL, Menu, TclError
+from tkinter import filedialog
 
 
 REPO_ROOT = Path(__file__).resolve().parent
 SHOW_PROGRESS_PY = REPO_ROOT / "show_segment_progress.py"
+WORKDIR = REPO_ROOT / "runs"
+
+HAS_ANALYZER = True
+try:
+    import analyze_seg_74_5_76 as vs_analyzer  # type: ignore
+except Exception as e:  # noqa: BLE001
+    HAS_ANALYZER = False
+    ANALYZER_IMPORT_ERROR = e
 
 
 @dataclass
 class DerivedFiles:
+    base: str
     workdir: Path
     seg_file: Path
     progress_file: Path
     out_file: Path
     log_file: Path
     patterns_file: Path
+    pid_file: Path
 
 
 def _normalize_pattern_line(line: str) -> str:
@@ -79,11 +91,25 @@ def _format_cmd_for_display(args: list[str]) -> str:
 
 
 def _safe_decode(b: bytes) -> str:
-    # На Windows при выводе в PIPE Python чаще пишет в системной ANSI-кодировке (обычно cp1251),
-    # а не в консольной (cp866). Поэтому пробуем cp1251 раньше cp866, чтобы не получать "кракозябры".
-    for enc in ("utf-8", "cp1251", "cp866"):
+    """
+    Декодирует байты из логов/подпроцессов максимально устойчиво.
+
+    Важно: на Windows вывод может быть "смешанным" (часть строк UTF-8, часть в ANSI/cp1251),
+    поэтому строгая попытка UTF-8 может упасть и привести к неверному откату на cp1251
+    (классический 'РЎРµРі...' вместо 'Сег...').
+
+    Решение: сначала пробуем UTF-8 *с errors=replace* (никогда не падает),
+    затем fallback на cp1251/cp866 для редких случаев.
+    """
+    if b is None:
+        return ""
+    try:
+        return b.decode("utf-8", errors="replace")
+    except Exception:
+        pass
+    for enc in ("utf-8-sig", "cp1251", "cp866"):
         try:
-            return b.decode(enc)
+            return b.decode(enc, errors="replace")
         except Exception:
             pass
     return b.decode("latin-1", errors="replace")
@@ -299,6 +325,7 @@ class VanityGUI:
         self.base_name = StringVar(value="puzzle71_69_72")
         self.prefix = StringVar(value="1PWo3JeB")
         self.suffix = StringVar(value="")
+        self.target = StringVar(value="1PWo3JeB9jrGwfHDNpdGK54CRas7fsVzXU")
         self.bits = IntVar(value=71)
         self.gpuid = StringVar(value="0")
         self.grid = StringVar(value="")
@@ -306,16 +333,18 @@ class VanityGUI:
         self.maxfound = IntVar(value=1_000_000)
         self.autosave = IntVar(value=120)
         self.auto_resume = BooleanVar(value=True)
-        self.tail_n = IntVar(value=30)
+        self.tail_n = IntVar(value=40)
 
         self._proc_lock = threading.Lock()
-        self._search_proc: subprocess.Popen | None = None
+        self._procs: dict[str, subprocess.Popen] = {}  # base_name -> process
         self._rebuild_thread: threading.Thread | None = None
         self._stop_rebuild = threading.Event()
         self._auto_refresh = BooleanVar(value=True)
+        self._ui_queue: "queue.Queue[tuple[str, str]]" = queue.Queue()
 
         self._build_ui()
         self._init_defaults()
+        self.root.after(100, self._drain_ui_queue)
         self._schedule_refresh()
 
     # ---------- UI ----------
@@ -326,9 +355,14 @@ class VanityGUI:
         # buttons (moved to top as requested)
         btn_row = ttk.Frame(top)
         btn_row.pack(fill=X)
-        ttk.Button(btn_row, text="STOP: убить все VanitySearch процессы", command=self.kill_all).pack(side=LEFT)
-        ttk.Button(btn_row, text="START: запуск поиска", command=self.start_search).pack(side=LEFT, padx=10)
-        ttk.Button(btn_row, text="REBUILD: пересобрать под этот ПК", command=self.rebuild).pack(side=LEFT)
+        ttk.Button(btn_row, text="STOP (текущая база)", command=self.stop_search).pack(side=LEFT)
+        ttk.Button(btn_row, text="STOP ALL (taskkill)", command=self.kill_all).pack(side=LEFT, padx=6)
+        ttk.Button(btn_row, text="START", command=self.start_search).pack(side=LEFT, padx=10)
+        ttk.Button(btn_row, text="REBUILD", command=self.rebuild).pack(side=LEFT)
+        ttk.Button(btn_row, text="Tail log", command=self.show_tail).pack(side=LEFT, padx=10)
+        ttk.Button(btn_row, text="Progress", command=self.show_progress).pack(side=LEFT)
+        ttk.Button(btn_row, text="Анализировать", command=self.run_analysis).pack(side=LEFT, padx=10)
+        ttk.Button(btn_row, text="Open runs folder", command=self.open_runs_folder).pack(side=LEFT, padx=10)
         ttk.Button(btn_row, text="Очистить вывод", command=self.clear_output).pack(side=RIGHT)
 
         # row 1: base name + derived
@@ -338,9 +372,10 @@ class VanityGUI:
         e_base = ttk.Entry(row1, textvariable=self.base_name, width=28)
         e_base.pack(side=LEFT, padx=6)
         attach_context_menu(e_base, allow_edit=True)
-        ttk.Button(row1, text="Показать лог (tail)", command=self.show_tail).pack(side=LEFT, padx=6)
         ttk.Button(row1, text="Показать найденные", command=self.show_found).pack(side=LEFT, padx=6)
-        ttk.Button(row1, text="Показать прогресс", command=self.show_progress).pack(side=LEFT, padx=6)
+
+        self.groups_label = ttk.Label(row1, text="Groups: 0", foreground="gray")
+        self.groups_label.pack(side=LEFT, padx=10)
 
         # row 2: pattern + bits
         row2 = ttk.Frame(top)
@@ -359,10 +394,19 @@ class VanityGUI:
         attach_context_menu(e_bits, allow_edit=True)
         ttk.Checkbutton(row2, text="auto-resume если progress есть", variable=self.auto_resume).pack(side=LEFT, padx=8)
 
+        # row 2c: target (for analyzer)
+        row2c = ttk.Frame(top)
+        row2c.pack(fill=X, pady=(6, 0))
+        ttk.Label(row2c, text="Target (optional):").pack(side=LEFT)
+        e_target = ttk.Entry(row2c, textvariable=self.target, width=46)
+        e_target.pack(side=LEFT, padx=6)
+        attach_context_menu(e_target, allow_edit=True)
+
         # row 2b: multi-patterns (-i)
         row2b = ttk.Frame(top)
         row2b.pack(fill=X, pady=(6, 0))
         ttk.Label(row2b, text="Паттерны (-i, по одному в строке; пустые/#+комментарии игнорируются):").pack(side=LEFT)
+        ttk.Button(row2b, text="Clear", command=self.clear_patterns).pack(side=RIGHT)
 
         # patterns text (compact)
         pat_frame = ttk.Frame(top)
@@ -404,12 +448,19 @@ class VanityGUI:
         mid = ttk.PanedWindow(self.root, orient=VERTICAL)
         mid.pack(fill=BOTH, expand=True, padx=10, pady=8)
 
-        seg_frame = ttk.Labelframe(mid, text="Сегменты (вставьте текст seg-файла)")
+        seg_frame = ttk.Labelframe(mid, text="Сегменты (вставьте текст seg-файла; группы разделяйте пустыми строками)")
         mid.add(seg_frame, weight=1)
+
+        seg_hdr = ttk.Frame(seg_frame)
+        seg_hdr.pack(fill=X, padx=8, pady=(8, 0))
+        ttk.Button(seg_hdr, text="Load seg...", command=self.load_seg_file).pack(side=RIGHT)
+        ttk.Button(seg_hdr, text="Save seg as...", command=self.save_seg_file_as).pack(side=RIGHT, padx=6)
 
         self.segments_text = Text(seg_frame, height=14, wrap="none")
         self.segments_text.pack(fill=BOTH, expand=True, padx=8, pady=8)
         attach_context_menu(self.segments_text, allow_edit=True)
+        self.segments_text.bind("<KeyRelease>", lambda e: self._update_groups_count())
+        self.segments_text.bind("<Button-1>", lambda e: self._update_groups_count())
 
         # output
         out_frame = ttk.Labelframe(mid, text="Вывод (лог / прогресс / build)")
@@ -449,6 +500,26 @@ class VanityGUI:
             except Exception:
                 pass
 
+    def _ui_log(self, s: str) -> None:
+        self._ui_queue.put(("log", s))
+
+    def _drain_ui_queue(self) -> None:
+        try:
+            while True:
+                kind, payload = self._ui_queue.get_nowait()
+                if kind == "log":
+                    self.log(payload)
+                elif kind == "report":
+                    self.log("\n" + ("=" * 80) + "\n")
+                    self.log("[ANALYZE] report\n")
+                    self.log(("=" * 80) + "\n")
+                    self.log(payload + ("\n" if not payload.endswith("\n") else ""))
+                else:
+                    self.log(f"[UI] unknown kind: {kind}\n")
+        except queue.Empty:
+            pass
+        self.root.after(100, self._drain_ui_queue)
+
     def clear_output(self) -> None:
         try:
             prev_state = str(self.output.cget("state"))
@@ -466,11 +537,18 @@ class VanityGUI:
             except Exception:
                 pass
 
-    def derived_files(self) -> DerivedFiles:
-        base = self.base_name.get().strip() or "run"
-        workdir = REPO_ROOT / "runs"
+    def clear_patterns(self) -> None:
+        if hasattr(self, "patterns_text") and self.patterns_text is not None:
+            self.patterns_text.delete("1.0", END)
+
+    def derived_files(self, group_num: int | None = None) -> DerivedFiles:
+        base = (self.base_name.get().strip() or "run").replace(" ", "_")
+        if group_num is not None:
+            base = f"{base}_{group_num}"
+        workdir = WORKDIR
         workdir.mkdir(parents=True, exist_ok=True)
         return DerivedFiles(
+            base=base,
             workdir=workdir,
             # Именование совместимо с *.sh и show_segment_progress.py:
             #   seg_<base>.txt, progress_<base>.dat, out_<base>.txt, log_<base>.log, patterns_<base>.txt
@@ -479,6 +557,7 @@ class VanityGUI:
             out_file=workdir / f"out_{base}.txt",
             log_file=workdir / f"log_{base}.log",
             patterns_file=workdir / f"patterns_{base}.txt",
+            pid_file=workdir / f"pid_{base}.txt",
         )
 
     def current_pattern(self) -> str:
@@ -525,6 +604,52 @@ class VanityGUI:
                 uniq.append(p)
         return uniq
 
+    def split_segments_into_groups(self) -> list[list[str]]:
+        txt = self.segments_text.get("1.0", END)
+        lines = txt.splitlines()
+        groups: list[list[str]] = []
+        current: list[str] = []
+
+        for line in lines:
+            stripped = (line or "").strip()
+            if not stripped or stripped.startswith("#") or stripped.startswith(";"):
+                if current:
+                    groups.append(current)
+                    current = []
+            else:
+                current.append(line)
+
+        if current:
+            groups.append(current)
+
+        if not groups:
+            non_empty = [
+                line
+                for line in lines
+                if line.strip()
+                and not line.strip().startswith("#")
+                and not line.strip().startswith(";")
+            ]
+            if non_empty:
+                groups.append(non_empty)
+
+        return groups
+
+    def _update_groups_count(self) -> None:
+        groups = self.split_segments_into_groups()
+        count = len(groups)
+        if count > 0:
+            self.groups_label.config(text=f"Groups: {count}", foreground="blue")
+        else:
+            self.groups_label.config(text="Groups: 0", foreground="gray")
+
+    def _strip_wildcards_prefix(self, s: str) -> str:
+        s = (s or "").strip()
+        for i, ch in enumerate(s):
+            if ch in ("*", "?"):
+                return s[:i]
+        return s
+
     def _init_defaults(self) -> None:
         cc = detect_compute_cap()
         prefer_sm61 = (cc.strip() == "6.1")
@@ -539,8 +664,12 @@ class VanityGUI:
                 "# Формат: abs <start_dec> <end_dec> <up|down> <name> [priority]\n"
                 "abs 0 1000 up seg1 1\n"
                 "abs 1000 0 down seg2 1\n"
+                "\n"
+                "# Пустая строка разделяет группы (каждая группа = отдельный процесс)\n"
+                "abs 2000 3000 up seg3 1\n"
             )
             self.segments_text.insert("1.0", sample)
+        self._update_groups_count()
         # подставим пример паттернов (как в RUNBOOK 4.1.1), если поле пустое
         if hasattr(self, "patterns_text") and not self.patterns_text.get("1.0", END).strip():
             self.patterns_text.insert("1.0", "# Примеры (по одному в строке, без кавычек):\n# 18ss\n# 1P*X\n")
@@ -552,12 +681,13 @@ class VanityGUI:
         for img in ("VanitySearch.exe",):
             subprocess.run(["taskkill", "/F", "/T", "/IM", img], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         with self._proc_lock:
-            if self._search_proc and self._search_proc.poll() is None:
+            for k, p in list(self._procs.items()):
                 try:
-                    self._search_proc.terminate()
+                    if p.poll() is None:
+                        p.terminate()
                 except Exception:
                     pass
-            self._search_proc = None
+                self._procs.pop(k, None)
         self.log("[STOP] OK\n")
 
     def rebuild(self) -> None:
@@ -568,10 +698,12 @@ class VanityGUI:
         self.log("[REBUILD] старт...\n")
 
         def worker():
-            rc = rebuild_for_current_machine(self.log, self._stop_rebuild)
-            self.log(f"\n[REBUILD] exitcode={rc}\n")
+            rc = rebuild_for_current_machine(self._ui_log, self._stop_rebuild)
+            self._ui_log(f"\n[REBUILD] exitcode={rc}\n")
             # после rebuild обновим grid по текущему exe
-            self._init_defaults()
+            self._ui_queue.put(("log", ""))  # просто триггер, чтобы очередь точно проснулась
+            # _init_defaults трогает tkinter, поэтому планируем в main-thread
+            self.root.after(0, self._init_defaults)
 
         self._rebuild_thread = threading.Thread(target=worker, daemon=True)
         self._rebuild_thread.start()
@@ -581,9 +713,6 @@ class VanityGUI:
         df.seg_file.write_text(txt, encoding="utf-8")
 
     def start_search(self) -> None:
-        df = self.derived_files()
-        self._write_segments_file(df)
-
         cc = detect_compute_cap()
         prefer_sm61 = (cc.strip() == "6.1")
         exe = find_vanity_exe(prefer_sm61)
@@ -596,6 +725,12 @@ class VanityGUI:
             self.log("Паттерны не заданы — заполните prefix (и опционально suffix) и/или добавьте строки в поле 'Паттерны (-i)'.\n")
             return
 
+        groups = self.split_segments_into_groups()
+        if not groups:
+            self.log("[START] Нет сегментов. Добавьте сегменты в поле 'Сегменты'.\n")
+            return
+        self.log(f"[START] Найдено групп сегментов: {len(groups)}\n")
+
         grid = self.grid.get().strip() or default_grid_for_current_gpu(exe)
         bits = int(self.bits.get())
         gpuid = self.gpuid.get().strip() or "0"
@@ -603,126 +738,260 @@ class VanityGUI:
         m = int(self.maxfound.get())
         autosave = int(self.autosave.get())
 
-        resume_flag = []
-        if self.auto_resume.get() and df.progress_file.exists():
-            resume_flag = ["-resume"]
+        started = 0
+        failed = 0
 
-        # Если паттерн один — передаём как последний аргумент.
-        # Если паттернов несколько — пишем patterns_<base>.txt и запускаем через -i (см. RUNBOOK 4.1.1).
-        pattern_args: list[str] = []
-        if len(patterns) == 1:
-            pattern_args = [patterns[0]]
-        else:
-            df.patterns_file.write_text("\n".join(patterns) + "\n", encoding="utf-8")
-            pattern_args = ["-i", str(df.patterns_file)]
+        multi = len(groups) > 1
+        for group_num, group_lines in enumerate(groups, start=1):
+            group_id = group_num if multi else None
+            df = self.derived_files(group_num=group_id)
 
-        args = [
-            str(exe),
-            "-seg", str(df.seg_file),
-            "-bits", str(bits),
-            "-gpu", "-gpuId", gpuid,
-            "-g", grid,
-            "-t", str(t),
-            "-m", str(m),
-            "-progress", str(df.progress_file),
-            "-autosave", str(autosave),
-            "-o", str(df.out_file),
-            *resume_flag,
-            *pattern_args,
-        ]
+            seg_content = "\n".join(group_lines).strip() + "\n"
+            df.seg_file.write_text(seg_content, encoding="utf-8")
 
-        self.log(f"[START] cwd={exe.parent}\n")
-        self.log(f"[START] seg={df.seg_file.name} progress={df.progress_file.name} out={df.out_file.name} log={df.log_file.name}\n")
-        if len(patterns) > 1:
-            self.log(f"[START] patterns: {len(patterns)} (через -i {df.patterns_file.name})\n")
-        self.log(f"[START] cmd: {_format_cmd_for_display(args)}\n")
+            resume_flag: list[str] = []
+            if self.auto_resume.get() and df.progress_file.exists():
+                resume_flag = ["-resume"]
 
-        # запускаем в фоне, stdout/stderr -> log
-        df.log_file.parent.mkdir(parents=True, exist_ok=True)
-        logf = df.log_file.open("ab")
+            pattern_args: list[str]
+            if len(patterns) == 1:
+                pattern_args = [patterns[0]]
+            else:
+                df.patterns_file.write_text("\n".join(patterns) + "\n", encoding="utf-8")
+                pattern_args = ["-i", str(df.patterns_file)]
 
-        with self._proc_lock:
-            if self._search_proc and self._search_proc.poll() is None:
-                self.log("[START] уже есть запущенный процесс — остановите его кнопкой STOP.\n")
-                logf.close()
-                return
-            try:
-                p = subprocess.Popen(args, cwd=str(exe.parent), stdout=logf, stderr=subprocess.STDOUT)
-            except Exception as e:
-                logf.close()
-                self.log(f"[START] ошибка запуска: {e}\n")
-                return
-            self._search_proc = p
+            args = [
+                str(exe),
+                "-seg", str(df.seg_file),
+                "-bits", str(bits),
+                "-gpu", "-gpuId", gpuid,
+                "-g", grid,
+                "-t", str(t),
+                "-m", str(m),
+                "-progress", str(df.progress_file),
+                "-autosave", str(autosave),
+                "-o", str(df.out_file),
+                *resume_flag,
+                *pattern_args,
+            ]
 
-        self.log(f"[START] PID={p.pid}\n")
+            self.log(f"\n[START Group {group_num}] cwd={exe.parent}\n")
+            self.log(f"[START Group {group_num}] seg={df.seg_file.name} progress={df.progress_file.name} out={df.out_file.name} log={df.log_file.name}\n")
+            self.log(f"[START Group {group_num}] cmd: {_format_cmd_for_display(args)}\n")
+
+            df.log_file.parent.mkdir(parents=True, exist_ok=True)
+            logf = df.log_file.open("ab")
+
+            with self._proc_lock:
+                existing = self._procs.get(df.base)
+                if existing and existing.poll() is None:
+                    self.log(f"[START Group {group_num}] уже запущено для base '{df.base}', пропускаю.\n")
+                    logf.close()
+                    continue
+                try:
+                    p = subprocess.Popen(args, cwd=str(exe.parent), stdout=logf, stderr=subprocess.STDOUT)
+                except Exception as e:
+                    logf.close()
+                    self.log(f"[START Group {group_num}] ошибка запуска: {e}\n")
+                    failed += 1
+                    continue
+                self._procs[df.base] = p
+                try:
+                    df.pid_file.write_text(str(p.pid), encoding="utf-8")
+                except Exception:
+                    pass
+
+            self.log(f"[START Group {group_num}] PID={p.pid}\n")
+            started += 1
+
+        self.log(f"\n[START] Summary: {started} started, {failed} failed\n")
+
+    def stop_search(self) -> None:
+        base_prefix = (self.base_name.get().strip() or "run").replace(" ", "_")
+        groups = self.split_segments_into_groups()
+        self.log(f"[STOP] stopping all groups for base '{base_prefix}'...\n")
+
+        stopped = 0
+        if not groups:
+            self.log("[STOP] no groups\n")
+            return
+
+        multi = len(groups) > 1
+        for group_num in range(1, len(groups) + 1):
+            group_id = group_num if multi else None
+            df = self.derived_files(group_num=group_id)
+            pid = None
+            if df.pid_file.exists():
+                try:
+                    pid = int(df.pid_file.read_text(encoding="utf-8").strip())
+                except Exception:
+                    pid = None
+
+            if pid:
+                try:
+                    subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    stopped += 1
+                except Exception:
+                    pass
+
+            with self._proc_lock:
+                p = self._procs.get(df.base)
+                if p and p.poll() is None:
+                    try:
+                        p.terminate()
+                        stopped += 1
+                    except Exception:
+                        pass
+                self._procs.pop(df.base, None)
+
+        self.log(f"[STOP] done ({stopped} processes stopped)\n")
 
     def show_tail(self) -> None:
-        df = self.derived_files()
+        groups = self.split_segments_into_groups()
         n = int(self.tail_n.get())
-        self.log(f"\n[TAIL] {df.log_file} (последние {n} строк)\n")
-        self.log(tail_lines(df.log_file, n) + "\n")
+        if not groups:
+            self.log("\n[TAIL] No groups found\n")
+            return
+        multi = len(groups) > 1
+        self.log(f"\n[TAIL] Showing last {n} lines from all groups:\n")
+        self.log("=" * 80 + "\n")
+        for group_num in range(1, len(groups) + 1):
+            group_id = group_num if multi else None
+            df = self.derived_files(group_num=group_id)
+            self.log(f"\n--- Group {group_num} ({df.log_file.name}) ---\n")
+            if df.log_file.exists():
+                self.log(tail_lines(df.log_file, n) + "\n")
+            else:
+                self.log("[LOG FILE NOT FOUND]\n")
+        self.log("=" * 80 + "\n")
 
     def show_found(self) -> None:
-        df = self.derived_files()
+        groups = self.split_segments_into_groups()
         n = int(self.tail_n.get())
-        if not df.out_file.exists():
-            self.log(f"\n[FOUND] файл не найден: {df.out_file}\n")
+        if not groups:
+            self.log("\n[FOUND] No groups found\n")
             return
-        self.log(f"\n[FOUND] {df.out_file} (последние {n} строк)\n")
-        self.log(tail_lines(df.out_file, n) + "\n")
+        multi = len(groups) > 1
+        self.log(f"\n[FOUND] Showing last {n} lines from out files for all groups:\n")
+        self.log("=" * 80 + "\n")
+        for group_num in range(1, len(groups) + 1):
+            group_id = group_num if multi else None
+            df = self.derived_files(group_num=group_id)
+            self.log(f"\n--- Group {group_num} ({df.out_file.name}) ---\n")
+            if df.out_file.exists():
+                self.log(tail_lines(df.out_file, n) + "\n")
+            else:
+                self.log("[OUT FILE NOT FOUND]\n")
+        self.log("=" * 80 + "\n")
 
     def show_progress(self) -> None:
-        df = self.derived_files()
+        groups = self.split_segments_into_groups()
         if not SHOW_PROGRESS_PY.exists():
             self.log(f"[PROGRESS] не найден {SHOW_PROGRESS_PY}\n")
             return
-        if not df.seg_file.exists():
-            self.log(f"[PROGRESS] seg файл не найден: {df.seg_file}\n")
-            return
-        if not df.progress_file.exists():
-            self.log(f"[PROGRESS] progress файл не найден: {df.progress_file}\n")
+        if not groups:
+            self.log("\n[PROGRESS] No groups found\n")
             return
 
         py = sys.executable
-        # Страховка на Windows: принудительно UTF-8 для подпроцесса (но мы всё равно декодируем гибко).
-        env = os.environ.copy()
-        env.setdefault("PYTHONUTF8", "1")
+        self.log(f"\n[PROGRESS] Showing progress for all {len(groups)} group(s):\n")
+        self.log("=" * 120 + "\n")
+
+        multi = len(groups) > 1
+        for group_num in range(1, len(groups) + 1):
+            group_id = group_num if multi else None
+            df = self.derived_files(group_num=group_id)
+            if not df.seg_file.exists():
+                self.log(f"\n--- Group {group_num} ---\n")
+                self.log(f"[PROGRESS] seg файл не найден: {df.seg_file}\n")
+                continue
+            if not df.progress_file.exists():
+                self.log(f"\n--- Group {group_num} ---\n")
+                self.log(f"[PROGRESS] progress файл не найден: {df.progress_file}\n")
+                continue
+
+            env = os.environ.copy()
+            env.setdefault("PYTHONUTF8", "1")
+            try:
+                p = subprocess.run(
+                    [py, str(SHOW_PROGRESS_PY), str(df.seg_file), str(df.progress_file), str(df.out_file)],
+                    cwd=str(REPO_ROOT),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=False,
+                    env=env,
+                    shell=False,
+                )
+                rc, out = p.returncode, _safe_decode(p.stdout or b"")
+            except Exception as e:
+                rc, out = 1, f"Ошибка запуска show_segment_progress.py: {e}"
+
+            self.log(f"\n{'=' * 120}\n")
+            self.log(f"GROUP {group_num} ({df.base}) | rc={rc}\n")
+            self.log(f"{'=' * 120}\n")
+            self.log(out + "\n")
+
+        self.log("=" * 120 + "\n")
+
+    def load_seg_file(self) -> None:
+        p = filedialog.askopenfilename(title="Select seg file", initialdir=str(REPO_ROOT))
+        if not p:
+            return
         try:
-            p = subprocess.run(
-                [py, str(SHOW_PROGRESS_PY), str(df.seg_file), str(df.progress_file)],
-                cwd=str(REPO_ROOT),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=False,
-                env=env,
-                shell=False,
-            )
-            rc, out = p.returncode, _safe_decode(p.stdout or b"")
+            txt = Path(p).read_text(encoding="utf-8")
+        except Exception:
+            txt = Path(p).read_text(errors="ignore")
+        self.segments_text.delete("1.0", END)
+        self.segments_text.insert("1.0", txt)
+        self._update_groups_count()
+        self.log(f"[SEG] loaded: {p}\n")
+
+    def save_seg_file_as(self) -> None:
+        p = filedialog.asksaveasfilename(title="Save seg file as", initialdir=str(REPO_ROOT), defaultextension=".txt")
+        if not p:
+            return
+        txt = self.segments_text.get("1.0", END).strip() + "\n"
+        Path(p).write_text(txt, encoding="utf-8")
+        self.log(f"[SEG] saved: {p}\n")
+
+    def open_runs_folder(self) -> None:
+        WORKDIR.mkdir(parents=True, exist_ok=True)
+        try:
+            if sys.platform == "win32":
+                os.startfile(str(WORKDIR))  # type: ignore[attr-defined]
+            else:
+                subprocess.run(["explorer", str(WORKDIR)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            self.log(f"[OPEN] {WORKDIR}\n")
         except Exception as e:
-            rc, out = 1, f"Ошибка запуска show_segment_progress.py: {e}"
-        self.log(f"\n[PROGRESS] rc={rc}\n")
-        self.log(out + "\n")
+            self.log(f"[OPEN] failed: {e}\n")
 
     def _schedule_refresh(self) -> None:
         # автообновление: показываем tail лога в окне вывода
         def tick():
             try:
                 if self._auto_refresh.get():
-                    df = self.derived_files()
-                    if df.log_file.exists():
+                    groups = self.split_segments_into_groups()
+                    if groups:
                         n = int(self.tail_n.get())
-                        # перерисовываем только tail-блок, чтобы не бесконечно раздувать output
-                        # простой подход: если процесс запущен — показываем последние N строк внизу.
                         with self._proc_lock:
-                            running = self._search_proc is not None and self._search_proc.poll() is None
-                        if running:
-                            tail = tail_lines(df.log_file, n)
-                            self._render_status(tail, df)
+                            running_bases = [b for b, p in self._procs.items() if p and p.poll() is None]
+                        if running_bases:
+                            blocks: list[str] = []
+                            multi = len(groups) > 1
+                            for group_num in range(1, len(groups) + 1):
+                                group_id = group_num if multi else None
+                                df = self.derived_files(group_num=group_id)
+                                if df.log_file.exists():
+                                    blocks.append(f"--- Group {group_num} ({df.log_file.name}) ---\n{tail_lines(df.log_file, n)}\n")
+                                else:
+                                    blocks.append(f"--- Group {group_num} ({df.log_file.name}) ---\n[LOG FILE NOT FOUND]\n")
+                            tail = "\n".join(blocks).rstrip() + "\n"
+                            self._render_status(tail, running_bases)
             finally:
                 self.root.after(1500, tick)
         self.root.after(1500, tick)
 
-    def _render_status(self, tail: str, df: DerivedFiles) -> None:
+    def _render_status(self, tail: str, running_bases: list[str]) -> None:
         # Не ломаем основной вывод пользователя: добавляем внизу компактный блок.
         marker = "\n=== AUTO-TAIL ===\n"
         try:
@@ -741,7 +1010,7 @@ class VanityGUI:
             self.output.delete("1.0", END)
             self.output.insert(END, head)
         self.output.insert(END, marker)
-        self.output.insert(END, f"log: {df.log_file.name} | progress: {df.progress_file.name} | out: {df.out_file.name}\n")
+        self.output.insert(END, f"running: {', '.join(running_bases)} | workdir: {WORKDIR}\n")
         self.output.insert(END, tail + "\n")
         self.output.see(END)
 
@@ -750,6 +1019,42 @@ class VanityGUI:
                 self.output.configure(state=prev_state)
             except Exception:
                 pass
+
+    # ----- Analyzer -----
+    def run_analysis(self) -> None:
+        if not HAS_ANALYZER:
+            self.log(f"[ANALYZE] analyzer module not available: {ANALYZER_IMPORT_ERROR}\n")
+            return
+
+        base_prefix = (self.base_name.get().strip() or "run").replace(" ", "_")
+        base_dir = WORKDIR
+        # Совместимо и с одиночным файлом out_<base>.txt, и с групповыми out_<base>_<n>.txt
+        glob_s = f"out_{base_prefix}*.txt"
+        prefix_s = self._strip_wildcards_prefix(self.prefix.get())
+        target_s = (self.target.get() or "").strip()
+
+        search_patterns = self.collect_patterns()
+        seg_groups = self.split_segments_into_groups()
+
+        def worker() -> None:
+            try:
+                report = vs_analyzer.generate_report(
+                    base_dir=base_dir,
+                    glob_pattern=glob_s,
+                    target_address=target_s,
+                    target_prefix=prefix_s,
+                    puzzle_bits=int(self.bits.get()),
+                    suggest_patterns=24,
+                    search_patterns=search_patterns,
+                    seg_groups=seg_groups,
+                    verify_crypto=10,
+                )
+            except Exception as e:  # noqa: BLE001
+                report = f"[ANALYZE] failed: {e}\n"
+            self._ui_queue.put(("report", report))
+
+        self.log("[ANALYZE] running...\n")
+        threading.Thread(target=worker, daemon=True).start()
 
     def run(self) -> None:
         self.root.mainloop()

@@ -58,7 +58,9 @@ static std::string FixedPrefixUntilWildcard(const std::string &s) {
   size_t pQ = s.find('?');
   size_t cut = std::string::npos;
   if (pStar != std::string::npos) cut = pStar;
-  if (pQ != std::string::npos) cut = (cut == std::string::npos ? pQ : std::min(cut, pQ));
+  // Windows/MSVC: возможны макросы min/max (например из Windows.h), которые ломают std::min.
+  // Паттерн (std::min)(a,b) предотвращает подстановку макроса.
+  if (pQ != std::string::npos) cut = (cut == std::string::npos ? pQ : (std::min)(cut, pQ));
   if (cut == std::string::npos) return s;
   return s.substr(0, cut);
 }
@@ -69,7 +71,8 @@ static std::string LongestCommonPrefix(const std::vector<std::string> &v) {
   for (size_t i = 1; i < v.size() && !p.empty(); i++) {
     const std::string &s = v[i];
     size_t j = 0;
-    size_t n = std::min(p.size(), s.size());
+    // См. комментарий выше про min/max макросы на Windows.
+    size_t n = (std::min)(p.size(), s.size());
     while (j < n && p[j] == s[j]) j++;
     p.resize(j);
   }
