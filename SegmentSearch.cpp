@@ -1062,7 +1062,8 @@ bool SegmentSearch::LoadProgress(const std::string &targetAddress) {
 }
 
 void SegmentSearch::UpdateProgress(int threadId, uint64_t keysChecked) {
-  if (!progressSavingEnabled) return;
+  // TEMP: commented out for testing segment switching
+  // if (!progressSavingEnabled) return;
   
 #ifndef WIN64
   pthread_mutex_lock(&mutex);
@@ -1117,20 +1118,41 @@ void SegmentSearch::UpdateProgress(int threadId, uint64_t keysChecked) {
     // В VanitySearch счётчик keysChecked обычно учитывает 6 вариантов (point + endo1 + endo2 + sym + ...),
     // поэтому один "шаг" по скаляру ≈ keysChecked/6.
     uint64_t scalarStep = keysChecked / 6ULL;
+    
+    // DEBUG: Вывод прогресса каждые 1000 вызовов
+    static int callCount = 0;
+    callCount++;
+    if (callCount % 1000 == 0) {
+      std::string currHex = segments[segIdx].currentKey.GetBase16();
+      std::string endHex = segments[segIdx].rangeEnd.GetBase16();
+      bool isGreater = segments[segIdx].currentKey.IsGreater(&segments[segIdx].rangeEnd);
+      printf("[DEBUG] Seg %d: curr=%s, end=%s, isGreater=%d\n",
+             segIdx, currHex.c_str(), endHex.c_str(), isGreater);
+    }
+    
     if (scalarStep > 0) {
       if (segments[segIdx].direction == DIRECTION_UP) {
         segments[segIdx].currentKey.Add(scalarStep);
+        
+        // Проверка завершения сегмента
         if (segments[segIdx].currentKey.IsGreater(&segments[segIdx].rangeEnd)) {
           segments[segIdx].active = false;
           activeSegments--;
-          printf("[SegmentSearch] Сегмент %s завершен (поиск вверх)\n", segments[segIdx].name.c_str());
+          std::string currDec = segments[segIdx].currentKey.GetBase10();
+          std::string endDec = segments[segIdx].rangeEnd.GetBase10();
+          printf("\n========================================\n");
+          printf("[SegmentSearch] *** Сегмент %s ЗАВЕРШЕН (поиск вверх) ***\n", segments[segIdx].name.c_str());
+          printf("[SegmentSearch] currentKey: %s\n", currDec.c_str());
+          printf("[SegmentSearch] rangeEnd:   %s\n", endDec.c_str());
+          printf("[SegmentSearch] Активных сегментов осталось: %d\n", activeSegments);
+          printf("========================================\n\n");
         }
       } else {
         segments[segIdx].currentKey.Sub(scalarStep);
         if (segments[segIdx].currentKey.IsLower(&segments[segIdx].rangeEnd)) {
           segments[segIdx].active = false;
           activeSegments--;
-          printf("[SegmentSearch] Сегмент %s завершен (поиск вниз)\n", segments[segIdx].name.c_str());
+          printf("[SegmentSearch] 🎉🎉🎉 Сегмент %s ЗАВЕРШЕН (поиск вниз) 🎉🎉🎉\n", segments[segIdx].name.c_str());
         }
       }
     }

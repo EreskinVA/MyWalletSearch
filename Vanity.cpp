@@ -195,6 +195,8 @@ VanitySearch::VanitySearch(Secp256K1 *secp, vector<std::string> &inputPrefixes,s
           segmentSearch->InitializeSegments(bitRange);
           segmentSearch->PrintSegments();
         }
+        
+        // Load Balancer будет включен позже в Search(), после установки nbCPUThread
       } else {
         printf("Warning: Failed to load segment file, using standard search\n");
         delete segmentSearch;
@@ -2647,6 +2649,13 @@ void VanitySearch::Search(int nbThread,std::vector<int> gpuId,std::vector<int> g
 #else
   ghMutex = CreateMutex(NULL, FALSE, NULL);
 #endif
+
+  // ✅ ВКЛЮЧАЕМ LOAD BALANCER для сегментного поиска (если включен)
+  if (useSegmentSearch && segmentSearch != NULL) {
+    int totalThreads = nbCPUThread + nbGPUThread;
+    segmentSearch->EnableLoadBalancing(totalThreads, 60); // Ребалансировка каждые 60 секунд
+    printf("[VanitySearch] ✓ Load Balancer включён: %d потоков, ребалансировка каждые 60 сек\n", totalThreads);
+  }
 
   TH_PARAM *params = (TH_PARAM *)malloc((nbCPUThread + nbGPUThread) * sizeof(TH_PARAM));
   memset(params,0,(nbCPUThread + nbGPUThread) * sizeof(TH_PARAM));

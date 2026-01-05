@@ -105,6 +105,9 @@ public:
   void UpdateLoadStats(int threadId, uint64_t keysChecked, double keysPerSecond);
   bool PerformRebalance();
   
+  // Получить индекс сегмента для потока (для логирования)
+  int GetSegmentForThread(int threadId);
+  
   // Выбор алгоритма поиска
   void SetSearchAlgorithm(SearchAlgorithm algorithm);
   SearchAlgorithm GetSearchAlgorithm() const { return searchAlgorithm; }
@@ -152,9 +155,6 @@ private:
   
   // Вычислить ключ для заданного процента
   void CalculateKeyAtPercent(double percent, Int &result);
-  
-  // Распределить сегменты между потоками (с учётом балансировки)
-  int GetSegmentForThread(int threadId);
   
   // Конвертация между SegmentProgress и SearchSegment
   void ExportToProgress();
