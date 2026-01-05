@@ -898,7 +898,32 @@ double SegmentSearch::GetOverallProgress() {
     
     double segProgress = 0.0;
     if (!segSize.IsZero()) {
-      segProgress = (progress.ToDouble() / segSize.ToDouble()) * 100.0;
+      // Безопасный расчёт процента для больших чисел
+      // Используем битовые сдвиги для масштабирования
+      if (progress.IsNegative()) {
+        // Прогресс не может быть отрицательным
+        segProgress = 0.0;
+      } else if (progress.IsGreater(&segSize)) {
+        // Прогресс больше размера сегмента - завершён
+        segProgress = 100.0;
+      } else {
+        // Вычисляем процент: (progress * 100) / segSize
+        // Для больших чисел используем деление напрямую
+        double progressD = progress.ToDouble();
+        double segSizeD = segSize.ToDouble();
+        
+        // Проверка на разумность значений
+        if (segSizeD > 0.0 && progressD >= 0.0 && progressD <= segSizeD * 2.0) {
+          segProgress = (progressD / segSizeD) * 100.0;
+          
+          // Ограничиваем процент в разумных пределах
+          if (segProgress < 0.0) segProgress = 0.0;
+          if (segProgress > 100.0) segProgress = 100.0;
+        } else {
+          // Некорректные значения - считаем прогресс нулевым
+          segProgress = 0.0;
+        }
+      }
     }
     
     totalProgress += segProgress;

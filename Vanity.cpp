@@ -2660,8 +2660,8 @@ void VanitySearch::Search(int nbThread,std::vector<int> gpuId,std::vector<int> g
   // ✅ ВКЛЮЧАЕМ LOAD BALANCER для сегментного поиска (если включен)
   if (useSegmentSearch && segmentSearch != NULL) {
     int totalThreads = nbCPUThread + nbGPUThread;
-    segmentSearch->EnableLoadBalancing(totalThreads, 5); // Ребалансировка каждые 5 секунд для быстрого переключения
-    printf("[VanitySearch] ✓ Load Balancer включён: %d потоков, ребалансировка каждые 5 сек\n", totalThreads);
+    segmentSearch->EnableLoadBalancing(totalThreads, 60); // Ребалансировка каждые 60 секунд
+    printf("[VanitySearch] ✓ Load Balancer включён: %d потоков, ребалансировка каждые 60 сек\n", totalThreads);
   }
 
   TH_PARAM *params = (TH_PARAM *)malloc((nbCPUThread + nbGPUThread) * sizeof(TH_PARAM));
@@ -2791,8 +2791,14 @@ void VanitySearch::Search(int nbThread,std::vector<int> gpuId,std::vector<int> g
           if (now - lastProgressLog >= 30) {
             // Получаем общий прогресс из SegmentSearch
             double overallProgress = segSearch->GetOverallProgress();
-            printf("\n[ProgressManager] Общий прогресс: %.2f%% | Активных сегментов: %d",
-                   overallProgress, activeSegs);
+            
+            // Проверка на разумность значения
+            if (overallProgress >= 0.0 && overallProgress <= 100.0) {
+              printf("\n[ProgressManager] Общий прогресс: %.2f%% | Активных сегментов: %d\n",
+                     overallProgress, activeSegs);
+            } else {
+              printf("\n[ProgressManager] Активных сегментов: %d (прогресс вычисляется...)\n", activeSegs);
+            }
             lastProgressLog = now;
           }
         }

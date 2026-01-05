@@ -1254,25 +1254,25 @@ class VanityUnifiedGUI:
         
         # Битность (берём из GUI)
         ttk.Label(main_frame, text="Битность пазла:").grid(row=row, column=0, sticky="w", pady=5)
-        bits_var = IntVar(value=self.bits.get())
-        bits_entry = ttk.Entry(main_frame, textvariable=bits_var, width=12)
+        bits_entry = ttk.Entry(main_frame, width=12)
         bits_entry.grid(row=row, column=1, sticky="w", pady=5, padx=5)
+        bits_entry.insert(0, str(self.bits.get()))
         ttk.Label(main_frame, text="(обычно 71)", foreground="gray").grid(row=row, column=2, sticky="w")
         row += 1
         
         # Начальный процент
         ttk.Label(main_frame, text="Начальный процент:").grid(row=row, column=0, sticky="w", pady=5)
-        start_percent_var = StringVar(value="67.5")
-        start_percent_entry = ttk.Entry(main_frame, textvariable=start_percent_var, width=12)
+        start_percent_entry = ttk.Entry(main_frame, width=12)
         start_percent_entry.grid(row=row, column=1, sticky="w", pady=5, padx=5)
+        start_percent_entry.insert(0, "67.5")
         ttk.Label(main_frame, text="(например 67.5)", foreground="gray").grid(row=row, column=2, sticky="w")
         row += 1
         
         # Конечный процент
         ttk.Label(main_frame, text="Конечный процент:").grid(row=row, column=0, sticky="w", pady=5)
-        end_percent_var = StringVar(value="68.9")
-        end_percent_entry = ttk.Entry(main_frame, textvariable=end_percent_var, width=12)
+        end_percent_entry = ttk.Entry(main_frame, width=12)
         end_percent_entry.grid(row=row, column=1, sticky="w", pady=5, padx=5)
+        end_percent_entry.insert(0, "68.9")
         ttk.Label(main_frame, text="(например 68.9)", foreground="gray").grid(row=row, column=2, sticky="w")
         row += 1
         
@@ -1282,17 +1282,17 @@ class VanityUnifiedGUI:
         
         # Сегментов в группе
         ttk.Label(main_frame, text="Сегментов в группе:").grid(row=row, column=0, sticky="w", pady=5)
-        segs_per_group_var = IntVar(value=6)
-        segs_per_group_entry = ttk.Entry(main_frame, textvariable=segs_per_group_var, width=12)
+        segs_per_group_entry = ttk.Entry(main_frame, width=12)
         segs_per_group_entry.grid(row=row, column=1, sticky="w", pady=5, padx=5)
+        segs_per_group_entry.insert(0, "8")
         ttk.Label(main_frame, text="(рекомендуется 6-12)", foreground="gray").grid(row=row, column=2, sticky="w")
         row += 1
         
         # Количество групп
         ttk.Label(main_frame, text="Количество групп:").grid(row=row, column=0, sticky="w", pady=5)
-        num_groups_var = IntVar(value=3)
-        num_groups_entry = ttk.Entry(main_frame, textvariable=num_groups_var, width=12)
+        num_groups_entry = ttk.Entry(main_frame, width=12)
         num_groups_entry.grid(row=row, column=1, sticky="w", pady=5, padx=5)
+        num_groups_entry.insert(0, "3")
         ttk.Label(main_frame, text="(обычно 1-5)", foreground="gray").grid(row=row, column=2, sticky="w")
         row += 1
         
@@ -1329,9 +1329,9 @@ class VanityUnifiedGUI:
         
         # Минимальный размер сегмента
         ttk.Label(main_frame, text="Мин. размер сегмента:").grid(row=row, column=0, sticky="w", pady=5)
-        min_size_var = IntVar(value=1000000)
-        min_size_entry = ttk.Entry(main_frame, textvariable=min_size_var, width=18)
+        min_size_entry = ttk.Entry(main_frame, width=18)
         min_size_entry.grid(row=row, column=1, sticky="w", pady=5, padx=5)
+        min_size_entry.insert(0, "1000000")
         ttk.Label(main_frame, text="(ключей)", foreground="gray").grid(row=row, column=2, sticky="w")
         row += 1
         
@@ -1350,14 +1350,26 @@ class VanityUnifiedGUI:
         
         def generate():
             try:
-                bits = bits_var.get()
-                start_percent = float(start_percent_var.get())
-                end_percent = float(end_percent_var.get())
-                segs_per_group = segs_per_group_var.get()
-                num_groups = num_groups_var.get()
+                # Читаем значения НАПРЯМУЮ из Entry виджетов
+                bits = int(bits_entry.get())
+                start_percent = float(start_percent_entry.get())
+                end_percent = float(end_percent_entry.get())
+                segs_per_group = int(segs_per_group_entry.get())
+                num_groups = int(num_groups_entry.get())
                 strategy = strategy_var.get()
-                min_size = min_size_var.get()
+                min_size = int(min_size_entry.get())
                 mode = mode_var.get()
+                
+                # Отладочный вывод - показываем полученные значения
+                self.log(f"[ГЕНЕРАТОР] 📋 Полученные параметры:\n")
+                self.log(f"  Битность: {bits}\n")
+                self.log(f"  Начальный %: {start_percent}\n")
+                self.log(f"  Конечный %: {end_percent}\n")
+                self.log(f"  Сегментов/группу: {segs_per_group}\n")
+                self.log(f"  Групп: {num_groups}\n")
+                self.log(f"  Стратегия: {strategy}\n")
+                self.log(f"  Мин. размер: {min_size}\n")
+                self.log(f"  Формат: {mode}\n")
                 
                 # Валидация
                 if start_percent >= end_percent:
