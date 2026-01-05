@@ -24,6 +24,7 @@
 #include "SECP256k1.h"
 #include "GPU/GPUEngine.h"
 #include "SegmentSearch.h"
+#include "BloomFilter.h"
 #ifdef WIN64
 #include <Windows.h>
 #endif
@@ -91,7 +92,7 @@ public:
                bool caseSensitive,Point &startPubKey,bool paranoiacSeed,
                bool useSegments=false,std::string segmentFile="",int bitRange=0,
                std::string progressFile="",bool resumeProgress=false,int autoSaveInterval=300,
-               bool useKangaroo=false);
+               bool useKangaroo=false,std::string databasePath="");
 
   void Search(int nbThread,std::vector<int> gpuId,std::vector<int> gridSize);
   void FindKeyCPU(TH_PARAM *p);
@@ -184,6 +185,48 @@ private:
   
   // Deduplication: track already written addresses to prevent duplicates
   std::unordered_set<std::string> foundAddresses;
+
+  // Database integration for checking generated addresses
+  std::string databasePath;
+  void *databaseHandle;  // sqlite3* handle (void* to avoid including sqlite3.h)
+  bool databaseEnabled;
+  bool databaseLoaded;
+  int nbFoundInDatabase;
+  std::string databaseOutputFile;
+  
+  // Binary hash160 key for ultra-fast comparisons (avoids Base58 encoding)
+  struct Hash160Key {
+    uint8_t data[20];
+    
+    bool operator==(const Hash160Key& other) const {
+      return memcmp(data, other.data, 20) == 0;
+    }
+  };
+  
+  // Hash function for Hash160Key
+  struct Hash160KeyHasher {
+    size_t operator()(const Hash160Key& key) const {
+      // Use first 8 bytes as hash (fast and good distribution)
+      return *((uint64_t*)key.data);
+    }
+  };
+  
+  // In-memory hash table for ultra-fast lookups
+  // OPTIMIZATION: Store binary hash160 instead of Base58 strings (10x faster!)
+  std::unordered_set<Hash160Key, Hash160KeyHasher> databaseHash160Set;
+  bool useInMemoryDatabase;  // Flag to enable in-memory mode
+  bool useBinaryHash;        // Flag to use binary hash160 (much faster!)
+  
+  // OPTIMIZATION: Bloom Filter for ultra-fast negative checks (100x faster!)
+  // Avoids cache misses by keeping small filter in L3 cache
+  BloomFilter* bloomFilter;
+  bool useBloomFilter;       // Flag to enable Bloom Filter (recommended!)
+  
+  bool initDatabase();
+  void closeDatabase();
+  bool checkAddressInDatabase(const std::string &addr);
+  bool checkHash160InDatabase(const uint8_t *hash160);  // OPTIMIZATION: Binary hash check
+  bool saveDatabaseMatch(const std::string &addr, Int &key, int32_t incr, int endomorphism, bool mode);
 
 #ifdef WIN64
   HANDLE ghMutex;

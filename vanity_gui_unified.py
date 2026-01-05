@@ -459,6 +459,9 @@ class VanityUnifiedGUI:
         self.autosave = IntVar(value=120)
         self.auto_resume = BooleanVar(value=True)
         self.tail_n = IntVar(value=40)
+        
+        # Database integration
+        self.database_path = StringVar(value="")
 
         # GPU-only
         self.gpuid = StringVar(value="0")
@@ -486,6 +489,13 @@ class VanityUnifiedGUI:
 
     # ---------- UI ----------
     def _build_ui(self) -> None:
+        # Настройка стилей
+        style = ttk.Style()
+        try:
+            style.configure("Database.TButton", foreground="darkgreen", font=("TkDefaultFont", 10, "bold"))
+        except Exception:
+            pass  # Если стиль не поддерживается, используем стандартный
+        
         top = ttk.Frame(self.root)
         top.pack(fill=X, padx=10, pady=8)
 
@@ -498,6 +508,7 @@ class VanityUnifiedGUI:
         ttk.Button(btn_row, text="Tail log", command=self.show_tail).pack(side=LEFT, padx=10)
         ttk.Button(btn_row, text="Progress", command=self.show_progress).pack(side=LEFT)
         ttk.Button(btn_row, text="Показать найденные", command=self.show_found).pack(side=LEFT, padx=10)
+        ttk.Button(btn_row, text="🎯 Найдено из базы", command=self.show_database_found, style="Database.TButton").pack(side=LEFT)
         ttk.Button(btn_row, text="Анализировать", command=self.run_analysis).pack(side=LEFT, padx=10)
         ttk.Button(btn_row, text="Open runs folder", command=self.open_runs_folder).pack(side=LEFT, padx=10)
         ttk.Button(btn_row, text="Очистить вывод", command=self.clear_output).pack(side=RIGHT)
@@ -522,7 +533,17 @@ class VanityUnifiedGUI:
         e_bin = ttk.Entry(row_paths, textvariable=self.binary_override, width=42)
         e_bin.pack(side=LEFT, padx=6)
         attach_context_menu(e_bin, allow_edit=True)
-        ttk.Button(row_paths, text="Browse...", command=self.pick_binary).pack(side=LEFT)
+        ttk.Button(row_paths, text="Browse...", command=self.pick_binary).pack(side=LEFT, padx=2)
+        ttk.Button(row_paths, text="Clear", command=lambda: self.binary_override.set("")).pack(side=LEFT, padx=2)
+
+        row_database = ttk.Frame(top)
+        row_database.pack(fill=X, pady=(6, 0))
+        ttk.Label(row_database, text="📁 База данных (SQLite, опционально):").pack(side=LEFT)
+        e_db = ttk.Entry(row_database, textvariable=self.database_path, width=60)
+        e_db.pack(side=LEFT, padx=6)
+        attach_context_menu(e_db, allow_edit=True)
+        ttk.Button(row_database, text="Browse DB...", command=self.pick_database).pack(side=LEFT)
+        ttk.Button(row_database, text="Clear", command=lambda: self.database_path.set("")).pack(side=LEFT, padx=4)
 
         row1 = ttk.Frame(top)
         row1.pack(fill=X, pady=(8, 0))
@@ -792,7 +813,31 @@ class VanityUnifiedGUI:
         p = filedialog.askopenfilename(title="Select VanitySearch binary", initialdir=str(REPO_ROOT))
         if not p:
             return
-        self.binary_override.set(str(Path(p)))
+        selected = Path(p)
+        # Предупреждение если выбран файл базы данных
+        if selected.suffix.lower() in ['.sqlite', '.sqlite3', '.db']:
+            self.log(f"⚠️  ВНИМАНИЕ: Выбран файл базы данных, а не исполняемый файл VanitySearch!\n")
+            self.log(f"   Файл: {selected}\n")
+            self.log(f"   Если это ошибка, выберите правильный файл (VanitySearch или VanitySearch.exe)\n")
+        self.binary_override.set(str(selected))
+    
+    def pick_database(self) -> None:
+        p = filedialog.askopenfilename(
+            title="Select SQLite Database",
+            initialdir=str(REPO_ROOT),
+            filetypes=[
+                ("SQLite Database", "*.sqlite *.sqlite3 *.db"),
+                ("All files", "*.*")
+            ]
+        )
+        if not p:
+            return
+        db_path = Path(p)
+        if not db_path.exists():
+            self.log(f"[DATABASE] файл не найден: {db_path}\n")
+            return
+        self.database_path.set(str(db_path))
+        self.log(f"[DATABASE] выбрана база: {db_path}\n")
 
     def resolve_binary(self) -> Path | None:
         ov = self.binary_override.get().strip()
@@ -877,6 +922,12 @@ class VanityUnifiedGUI:
         if not binp or not binp.exists():
             self.log("[START] Бинарник VanitySearch не найден. Укажите Binary override или нажмите BUILD/REBUILD.\n")
             return
+        
+        # Защита от случайного указания базы данных вместо бинарника
+        if binp.suffix.lower() in ['.sqlite', '.sqlite3', '.db']:
+            self.log(f"[START] ❌ ОШИБКА: В поле 'Binary override' указан файл базы данных: {binp}\n")
+            self.log("[START] Очистите поле 'Binary override' или укажите путь к исполняемому файлу VanitySearch\n")
+            return
 
         patterns = self.collect_patterns()
         if not patterns:
@@ -928,6 +979,17 @@ class VanityUnifiedGUI:
             ]
             if is_gpu:
                 args.extend(["-gpu", "-gpuId", gpuid, "-g", grid])
+            
+            # Database integration
+            db_path = self.database_path.get().strip()
+            if db_path:
+                db_file = Path(db_path)
+                if db_file.exists():
+                    args.extend(["-db", str(db_file)])
+                    self.log(f"[START Group {group_num}] 📁 База данных: {db_file}\n")
+                else:
+                    self.log(f"[START Group {group_num}] ⚠️  База данных не найдена: {db_path}, продолжаем без базы\n")
+            
             args.extend(
                 [
                     "-t",
@@ -1058,6 +1120,52 @@ class VanityUnifiedGUI:
             else:
                 self.log("[OUT FILE NOT FOUND]\n")
         self.log("=" * 80 + "\n")
+    
+    def show_database_found(self) -> None:
+        """Показать найденные адреса из базы данных (*_DatabaseFound.txt)"""
+        groups = self.split_segments_into_groups()
+        n = int(self.tail_n.get())
+        if not groups:
+            self.log("\n[DATABASE FOUND] No groups found\n")
+            return
+        
+        # Проверяем, включена ли база данных
+        db_path = self.database_path.get().strip()
+        if not db_path:
+            self.log("\n[DATABASE FOUND] ⚠️  База данных не указана в настройках\n")
+            self.log("[DATABASE FOUND] Укажите путь к базе данных и перезапустите поиск\n")
+            return
+        
+        multi = len(groups) > 1
+        self.log(f"\n{'='*80}\n")
+        self.log(f"🎯 НАЙДЕННЫЕ АДРЕСА ИЗ БАЗЫ ДАННЫХ\n")
+        self.log(f"{'='*80}\n")
+        self.log(f"База данных: {db_path}\n")
+        self.log(f"Показано последних {n} строк из каждого файла\n")
+        self.log(f"{'='*80}\n")
+        
+        total_found = 0
+        for group_num in range(1, len(groups) + 1):
+            df = self.derived_files(group_num=(group_num if multi else None), groups_total=len(groups))
+            # Формируем имя файла с результатами из базы
+            db_out_file = df.out_file.parent / (df.out_file.stem + "_DatabaseFound.txt")
+            
+            self.log(f"\n--- Group {group_num} ({db_out_file.name}) ---\n")
+            if db_out_file.exists():
+                content = tail_lines(db_out_file, n)
+                if content.strip():
+                    self.log(content + "\n")
+                    # Подсчитываем количество найденных адресов (ищем строки с "PubAddress:")
+                    count = content.count("PubAddress:")
+                    total_found += count
+                else:
+                    self.log("[ФАЙЛ ПУСТОЙ]\n")
+            else:
+                self.log("[ФАЙЛ НЕ НАЙДЕН - адреса из базы не найдены]\n")
+        
+        self.log(f"\n{'='*80}\n")
+        self.log(f"📊 Всего найдено адресов из базы: {total_found}\n")
+        self.log(f"{'='*80}\n")
 
     def show_progress(self) -> None:
         groups = self.split_segments_into_groups()

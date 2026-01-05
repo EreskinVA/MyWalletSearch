@@ -71,6 +71,7 @@ void printUsage() {
   printf(" -resume: Resume from saved progress file\n");
   printf(" -autosave interval: Auto-save interval in seconds (default: 300)\n");
   printf(" -kangaroo: Use Pollard's Kangaroo algorithm (O(sqrt(N)), EXPERIMENTAL)\n");
+  printf(" -db database: Check generated addresses against SQLite database (e.g., bitcoin_addresses.sqlite)\n");
   printf(" -genGroup n: Regenerate GPU/GPUGroup.h with GRP_SIZE=n (useful to reduce GPU stack/memory)\n");
   exit(0);
 
@@ -432,6 +433,7 @@ int main(int argc, char* argv[]) {
   bool resumeProgress = false;
   int autoSaveInterval = 300;
   bool useKangaroo = false;
+  string databasePath = "";
 
   while (a < argc) {
 
@@ -597,6 +599,10 @@ int main(int argc, char* argv[]) {
     } else if (strcmp(argv[a], "-kangaroo") == 0) {
       useKangaroo = true;
       a++;
+    } else if (strcmp(argv[a], "-db") == 0) {
+      a++;
+      databasePath = string(argv[a]);
+      a++;
     } else if (strcmp(argv[a], "-h") == 0) {
       printUsage();
     } else if (a == argc - 1) {
@@ -674,7 +680,7 @@ int main(int argc, char* argv[]) {
   VanitySearch *v = new VanitySearch(secp, prefix, seed, searchMode, gpuEnable, stop, outputFile, sse,
     maxFound, rekey, caseSensitive, startPuKey, paranoiacSeed, 
     useSegments, segmentFile, bitRange, progressFile, resumeProgress, autoSaveInterval,
-    useKangaroo);
+    useKangaroo, databasePath);
   v->Search(nbCPUThread,gpuId,gridSize);
 
   return 0;

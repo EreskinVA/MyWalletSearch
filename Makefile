@@ -58,14 +58,14 @@ CXXFLAGS   = -DWITHGPU $(ARCHFLAGS) -Wno-write-strings -g -I. -I$(CUDA)/include
 else
 CXXFLAGS   =  -DWITHGPU $(ARCHFLAGS) -Wno-write-strings -O3 -I. -I$(CUDA)/include
 endif
-LFLAGS     = -lpthread -L$(CUDA)/lib64 -lcudart
+LFLAGS     = -lpthread -L$(CUDA)/lib64 -lcudart -lsqlite3
 else
 ifdef debug
 CXXFLAGS   = $(ARCHFLAGS) -Wno-write-strings -g -I. -I$(CUDA)/include
 else
 CXXFLAGS   =  $(ARCHFLAGS) -Wno-write-strings -O3 -I. -I$(CUDA)/include
 endif
-LFLAGS     = -lpthread
+LFLAGS     = -lpthread -lsqlite3
 endif
 
 
