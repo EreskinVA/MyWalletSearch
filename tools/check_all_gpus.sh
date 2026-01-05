@@ -95,3 +95,4 @@ echo "Проблемные GPU:     $fail_file"
 
 
 
+

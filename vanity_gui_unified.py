@@ -637,8 +637,20 @@ class VanityUnifiedGUI:
         ttk.Button(seg_hdr, text="Load seg...", command=self.load_seg_file).pack(side=RIGHT)
         ttk.Button(seg_hdr, text="Save seg as...", command=self.save_seg_file_as).pack(side=RIGHT, padx=6)
         ttk.Button(seg_hdr, text="🎲 Сгенерировать...", command=self.generate_segments_dialog).pack(side=RIGHT, padx=6)
-        self.segments_text = Text(seg_frame, height=14, wrap="none")
-        self.segments_text.pack(fill=BOTH, expand=True, padx=8, pady=8)
+        
+        # Контейнер для текстового поля и скроллбара
+        seg_text_wrap = ttk.Frame(seg_frame)
+        seg_text_wrap.pack(fill=BOTH, expand=True, padx=8, pady=8)
+        
+        # Вертикальный скроллбар
+        seg_yscroll = ttk.Scrollbar(seg_text_wrap, orient=VERTICAL)
+        seg_yscroll.pack(side=RIGHT, fill=Y)
+        
+        # Текстовое поле с привязкой к скроллбару
+        self.segments_text = Text(seg_text_wrap, height=14, wrap="none", yscrollcommand=seg_yscroll.set)
+        self.segments_text.pack(side=LEFT, fill=BOTH, expand=True)
+        seg_yscroll.config(command=self.segments_text.yview)
+        
         attach_context_menu(self.segments_text, allow_edit=True)
         self.segments_text.bind("<KeyRelease>", lambda _e: self._update_groups_count())
         self.segments_text.bind("<Button-1>", lambda _e: self._update_groups_count())
