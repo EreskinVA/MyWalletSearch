@@ -1,0 +1,161 @@
+#---------------------------------------------------------------------
+# Makefile for VanitySearch (Windows)
+#
+# Author : Jean-Luc PONS
+# Adapted for Windows with CUDA
+
+SRC_COMMON = Base58.cpp IntGroup.cpp main.cpp Random.cpp \
+      Timer.cpp Int.cpp IntMod.cpp Point.cpp SECP256K1.cpp \
+      Vanity.cpp GPU/GPUGenerate.cpp hash/ripemd160.cpp \
+      hash/sha256.cpp hash/sha512.cpp Bech32.cpp Wildcard.cpp SegmentSearch.cpp \
+      ProgressManager.cpp LoadBalancer.cpp AdaptivePriority.cpp KangarooSearch.cpp
+
+SRC_X86 = hash/ripemd160_sse.cpp hash/sha256_sse.cpp AVX512.cpp AVX512BatchProcessor.cpp
+SRC_ARM = NEON_ARM.cpp
+
+OBJDIR = obj
+
+# Detect OS
+ifeq ($(OS),Windows_NT)
+    DETECTED_OS := Windows
+else
+    DETECTED_OS := $(shell uname -s)
+endif
+
+# Select sources based on architecture (Windows is x86_64)
+SRC = $(SRC_COMMON) $(SRC_X86)
+
+OBJET = $(addprefix $(OBJDIR)/, $(SRC:.cpp=.o))
+
+ifdef gpu
+OBJET += $(OBJDIR)/GPU/GPUEngine.o
+endif
+
+# Windows paths
+ifeq ($(DETECTED_OS),Windows)
+    # Default CUDA path for Windows
+    CUDA_PATH ?= C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.1
+    CUDA := $(subst \,/,$(CUDA_PATH))
+    
+    # Try to find g++ in common locations
+    ifeq ($(wildcard C:/msys64/mingw64/bin/g++.exe),)
+        ifeq ($(wildcard C:/MinGW/bin/g++.exe),)
+            # Use cl.exe if available (Visual Studio)
+            CXX = cl.exe
+            CXXCUDA = cl.exe
+            USE_CL = 1
+        else
+            CXX = C:/MinGW/bin/g++.exe
+            CXXCUDA = C:/MinGW/bin/g++.exe
+        endif
+    else
+        CXX = C:/msys64/mingw64/bin/g++.exe
+        CXXCUDA = C:/msys64/mingw64/bin/g++.exe
+    endif
+    
+    NVCC = $(CUDA)/bin/nvcc.exe
+    ARCHFLAGS = -m64 -mssse3
+    
+    ifdef USE_CL
+        # Visual Studio compiler flags
+        CXXFLAGS_BASE = /DWITHGPU /O2 /EHsc /I. /I"$(CUDA)/include" /std:c++17
+        LFLAGS_BASE = cudart.lib
+    else
+        # MinGW compiler flags
+        CXXFLAGS_BASE = -DWITHGPU $(ARCHFLAGS) -Wno-write-strings -O3 -I. -I"$(CUDA)/include"
+        LFLAGS_BASE = -L"$(CUDA)/lib/x64" -lcudart
+    endif
+else
+    # Linux/Mac paths (original)
+    CXX = g++
+    CUDA ?= /usr/local/cuda
+    CXXCUDA ?= /usr/bin/g++
+    NVCC = $(CUDA)/bin/nvcc
+    ARCHFLAGS = -m64 -mssse3
+    CXXFLAGS_BASE = -DWITHGPU $(ARCHFLAGS) -Wno-write-strings -O3 -I. -I$(CUDA)/include
+    LFLAGS_BASE = -lpthread -L$(CUDA)/lib64 -lcudart
+endif
+
+# nvcc requires joint notation w/o dot, i.e. "6.1" -> "61"
+ccap = $(subst .,,$(CCAP))
+
+ifdef gpu
+ifdef debug
+    ifdef USE_CL
+        CXXFLAGS = $(CXXFLAGS_BASE) /Zi
+        LFLAGS = $(LFLAGS_BASE) /DEBUG
+    else
+        CXXFLAGS = $(CXXFLAGS_BASE) -g
+        LFLAGS = $(LFLAGS_BASE) -lpthread
+    endif
+else
+    CXXFLAGS = $(CXXFLAGS_BASE)
+    ifdef USE_CL
+        LFLAGS = $(LFLAGS_BASE)
+    else
+        LFLAGS = $(LFLAGS_BASE) -lpthread
+    endif
+endif
+else
+ifdef debug
+    ifdef USE_CL
+        CXXFLAGS = /O2 /EHsc /I. /I"$(CUDA)/include" /Zi /std:c++17
+        LFLAGS = 
+    else
+        CXXFLAGS = $(ARCHFLAGS) -Wno-write-strings -g -I. -I"$(CUDA)/include"
+        LFLAGS = -lpthread
+    endif
+else
+    ifdef USE_CL
+        CXXFLAGS = /O2 /EHsc /I. /I"$(CUDA)/include" /std:c++17
+        LFLAGS = 
+    else
+        CXXFLAGS = $(ARCHFLAGS) -Wno-write-strings -O3 -I. -I"$(CUDA)/include"
+        LFLAGS = -lpthread
+    endif
+endif
+endif
+
+#--------------------------------------------------------------------
+
+ifdef gpu
+ifdef debug
+$(OBJDIR)/GPU/GPUEngine.o: GPU/GPUEngine.cu
+	@echo Compiling GPU code with CCAP=$(ccap)...
+	$(NVCC) -G -maxrregcount=0 --ptxas-options=-v --compile -ccbin "$(CXXCUDA)" -m64 -g -I"$(CUDA)/include" -gencode=arch=compute_$(ccap),code=sm_$(ccap) -o $(OBJDIR)/GPU/GPUEngine.o -c GPU/GPUEngine.cu
+else
+$(OBJDIR)/GPU/GPUEngine.o: GPU/GPUEngine.cu
+	@echo Compiling GPU code with CCAP=$(ccap)...
+	$(NVCC) -maxrregcount=0 --ptxas-options=-v --compile -ccbin "$(CXXCUDA)" -m64 -O2 -I"$(CUDA)/include" -gencode=arch=compute_$(ccap),code=sm_$(ccap) -o $(OBJDIR)/GPU/GPUEngine.o -c GPU/GPUEngine.cu
+endif
+endif
+
+$(OBJDIR)/%.o : %.cpp
+	@echo Compiling $<...
+	$(CXX) $(CXXFLAGS) -o $@ -c $<
+
+all: VanitySearch.exe
+
+VanitySearch.exe: $(OBJET)
+	@echo Linking VanitySearch...
+	$(CXX) $(OBJET) $(LFLAGS) -o VanitySearch.exe
+	@echo Build complete!
+
+$(OBJET): | $(OBJDIR) $(OBJDIR)/GPU $(OBJDIR)/hash
+
+$(OBJDIR):
+	@if not exist $(OBJDIR) mkdir $(OBJDIR)
+
+$(OBJDIR)/GPU: $(OBJDIR)
+	@if not exist $(OBJDIR)\GPU mkdir $(OBJDIR)\GPU
+
+$(OBJDIR)/hash: $(OBJDIR)
+	@if not exist $(OBJDIR)\hash mkdir $(OBJDIR)\hash
+
+clean:
+	@echo Cleaning...
+	@if exist $(OBJDIR)\*.o del /q $(OBJDIR)\*.o
+	@if exist $(OBJDIR)\GPU\*.o del /q $(OBJDIR)\GPU\*.o
+	@if exist $(OBJDIR)\hash\*.o del /q $(OBJDIR)\hash\*.o
+	@if exist VanitySearch.exe del /q VanitySearch.exe
+

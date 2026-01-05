@@ -1,0 +1,65 @@
+# Build artifacts
+VanitySearch
+VanitySearch-*
+*.o
+*.exe
+obj/
+*.dat
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Temporary files
+test_*.txt
+bench.txt
+temp_*.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Progress files (содержат приватные данные!)
+*progress*.dat
+search*.dat
+kangaroo*.dat
+
+# Results (содержат приватные ключи!)
+*SOLUTION*.txt
+*FOUND*.txt
+*JACKPOT*.txt
+results*.txt
+RESULTS*.txt
+
+# Runtime output dirs / artifacts (server + local runs)
+runs_cpu_gui/
+server_results/
+
+# Local analysis reports (обычно локальные артефакты)
+ANALYZE*.txt
+
+# Local segment presets (обычно локальные/временные)
+seg_local_*.txt
+
+# Output / progress files (часто содержат приватные ключи / промежуточные данные)
+out_*.txt
+out*.txt
+progress_*.dat
+
+# Address dumps / merged outputs (обычно большие и генерируются заново)
+*.addr
+merged_out*.txt
+puzzle*_solution_table*.csv
+
+# Large test files
+*.bin
+*.dump

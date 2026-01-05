@@ -1,0 +1,13 @@
+# Test segment "matrix" for bidirectional runs (UP/DOWN)
+# Format: startPercent endPercent direction [name]
+#
+# Notes:
+# - UP expects start <= end
+# - DOWN expects start > end
+#
+# Small widths so the test finishes quickly.
+10.00 10.20 up   seg_up_a
+10.20 10.00 down seg_down_a
+50.00 50.20 up   seg_up_b
+50.20 50.00 down seg_down_b
+

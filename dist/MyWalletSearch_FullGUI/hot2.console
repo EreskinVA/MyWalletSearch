@@ -1,0 +1,164 @@
+VanitySearch v1.19
+
+=== Segment Search Mode ===
+Config file: segments_hot.txt
+Bit range: 71
+Algorithm: Standard linear search
+Progress file: hot2.dat
+Auto-save interval: 300 sec
+==========================
+
+[SegmentSearch] Загрузка конфигурации из segments_hot.txt
+[SegmentSearch] Добавлен сегмент: golden_73 (78.17% -> 80.61%, направление: ВВЕРХ)
+[SegmentSearch] Добавлен сегмент: golden_74 (80.61% -> 83.06%, направление: ВВЕРХ)
+[SegmentSearch] Загружено сегментов: 2
+[SegmentSearch] Инициализация для 71-битного диапазона
+[SegmentSearch] Диапазон: 400000000000000000
+[SegmentSearch]      до: 7FFFFFFFFFFFFFFFFF
+[SegmentSearch] golden_73: 7206A3121352EE0E90 -> 73973A843559532D79
+[SegmentSearch] golden_74: 73973A843559532D79 -> 7527D1F6575FB84C62
+
+=== Конфигурация сегментов поиска ===
+Всего сегментов: 2
+Активных сегментов: 2
+Битовый диапазон: 71
+
+Сегмент 1: golden_73
+  Диапазон: 78.17% -> 80.61%
+  Направление: ВВЕРХ ↑
+  Статус: Активен
+  Начало: 7206A3121352EE0E90
+  Конец:  73973A843559532D79
+
+Сегмент 2: golden_74
+  Диапазон: 80.61% -> 83.06%
+  Направление: ВВЕРХ ↑
+  Статус: Активен
+  Начало: 73973A843559532D79
+  Конец:  7527D1F6575FB84C62
+
+=====================================
+
+[ProgressManager] Автосохранение включено (интервал: 300 сек)
+[SegmentSearch] Сохранение прогресса включено: hot2.dat
+[PositionalMask] Паттерн 0: найдено 4 фиксированных позиций
+Search: 1PWo* [Compressed]
+Start Wed Dec 24 18:55:18 2025
+Base Key: A53BBD16B262B8FC636C7AE435F02BC579AE996D429443E58D8A26362F419263
+Number of CPU thread: 4
+[0.64 Mkey/s][GPU 0.00 Mkey/s][Total 2^20.31][Found 17]  [Segments: 2 active]
+[ProgressManager] Общий прогресс: 0.00% | Активных сегментов: 2[0.61 Mkey/s][GPU 0.00 Mkey/s][Total 2^21.23][Found 29]  [Segments: 2 active][0.58 Mkey/s][GPU 0.00 Mkey/s][Total 2^21.74][Found 44]  [Segments: 2 active][0.57 Mkey/s][GPU 0.00 Mkey/s][Total 2^22.13][Found 60]  [Segments: 2 active][0.55 Mkey/s][GPU 0.00 Mkey/s][Total 2^22.40][Found 75]  [Segments: 2 active][0.55 Mkey/s][GPU 0.00 Mkey/s][Total 2^22.66][Found 84]  [Segments: 2 active][0.55 Mkey/s][GPU 0.00 Mkey/s][Total 2^22.90][Found 98]  [Segments: 2 active][0.56 Mkey/s][GPU 0.00 Mkey/s][Total 2^23.10][Found 119]  [Segments: 2 active][0.54 Mkey/s][GPU 0.00 Mkey/s][Total 2^23.26][Found 139]  [Segments: 2 active][0.52 Mkey/s][GPU 0.00 Mkey/s][Total 2^23.36][Found 148]  [Segments: 2 active][0.53 Mkey/s][GPU 0.00 Mkey/s][Total 2^23.52][Found 160]  [Segments: 2 active][0.53 Mkey/s][GPU 0.00 Mkey/s][Total 2^23.65][Found 167]  [Segments: 2 active][0.54 Mkey/s][GPU 0.00 Mkey/s][Total 2^23.76][Found 188]  [Segments: 2 active][0.54 Mkey/s][GPU 0.00 Mkey/s][Total 2^23.87][Found 200]  [Segments: 2 active][0.54 Mkey/s][GPU 0.00 Mkey/s][Total 2^23.98][Found 218]  [Segments: 2 active][0.54 Mkey/s][GPU 0.00 Mkey/s][Total 2^24.09][Found 231]  [Segments: 2 active]
+[ProgressManager] Общий прогресс: 0.00% | Активных сегментов: 2[0.56 Mkey/s][GPU 0.00 Mkey/s][Total 2^24.18][Found 248]  [Segments: 2 active][0.59 Mkey/s][GPU 0.00 Mkey/s][Total 2^24.27][Found 261]  [Segments: 2 active][0.59 Mkey/s][GPU 0.00 Mkey/s][Total 2^24.36][Found 278]  [Segments: 2 active][0.60 Mkey/s][GPU 0.00 Mkey/s][Total 2^24.44][Found 296]  [Segments: 2 active][0.61 Mkey/s][GPU 0.00 Mkey/s][Total 2^24.52][Found 312]  [Segments: 2 active][0.62 Mkey/s][GPU 0.00 Mkey/s][Total 2^24.59][Found 338]  [Segments: 2 active][0.62 Mkey/s][GPU 0.00 Mkey/s][Total 2^24.66][Found 355]  [Segments: 2 active][0.61 Mkey/s][GPU 0.00 Mkey/s][Total 2^24.72][Found 370]  [Segments: 2 active][0.60 Mkey/s][GPU 0.00 Mkey/s][Total 2^24.77][Found 381]  [Segments: 2 active][0.59 Mkey/s][GPU 0.00 Mkey/s][Total 2^24.82][Found 393]  [Segments: 2 active][0.56 Mkey/s][GPU 0.00 Mkey/s][Total 2^24.87][Found 410]  [Segments: 2 active][0.56 Mkey/s][GPU 0.00 Mkey/s][Total 2^24.92][Found 426]  [Segments: 2 active][0.56 Mkey/s][GPU 0.00 Mkey/s][Total 2^24.98][Found 439]  [Segments: 2 active][0.55 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.03][Found 455]  [Segments: 2 active][0.55 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.08][Found 471]  [Segments: 2 active]
+[ProgressManager] Общий прогресс: 0.00% | Активных сегментов: 2[0.53 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.11][Found 480]  [Segments: 2 active][0.53 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.15][Found 496]  [Segments: 2 active][0.51 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.18][Found 513]  [Segments: 2 active][0.52 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.21][Found 522]  [Segments: 2 active][0.49 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.24][Found 534]  [Segments: 2 active][0.48 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.28][Found 547]  [Segments: 2 active][0.48 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.32][Found 556]  [Segments: 2 active][0.47 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.36][Found 573]  [Segments: 2 active][0.49 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.40][Found 583]  [Segments: 2 active][0.51 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.43][Found 598]  [Segments: 2 active][0.52 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.47][Found 613]  [Segments: 2 active][0.51 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.49][Found 621]  [Segments: 2 active][0.50 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.51][Found 631]  [Segments: 2 active][0.49 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.53][Found 637]  [Segments: 2 active][0.48 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.56][Found 649]  [Segments: 2 active]
+[ProgressManager] Общий прогресс: 0.00% | Активных сегментов: 2[0.47 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.59][Found 664]  [Segments: 2 active][0.47 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.62][Found 678]  [Segments: 2 active][0.47 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.66][Found 687]  [Segments: 2 active][0.48 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.69][Found 706]  [Segments: 2 active][0.51 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.72][Found 719]  [Segments: 2 active][0.54 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.75][Found 735]  [Segments: 2 active][0.56 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.78][Found 751]  [Segments: 2 active][0.56 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.81][Found 757]  [Segments: 2 active][0.58 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.84][Found 770]  [Segments: 2 active][0.58 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.87][Found 788]  [Segments: 2 active][0.60 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.90][Found 794]  [Segments: 2 active][0.60 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.93][Found 820]  [Segments: 2 active][0.60 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.95][Found 840]  [Segments: 2 active][0.60 Mkey/s][GPU 0.00 Mkey/s][Total 2^25.98][Found 857]  [Segments: 2 active][0.59 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.00][Found 868]  [Segments: 2 active]
+[ProgressManager] Общий прогресс: 0.00% | Активных сегментов: 2[0.59 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.02][Found 883]  [Segments: 2 active][0.56 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.04][Found 893]  [Segments: 2 active][0.54 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.06][Found 905]  [Segments: 2 active][0.53 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.08][Found 920]  [Segments: 2 active][0.52 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.10][Found 931]  [Segments: 2 active][0.51 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.12][Found 948]  [Segments: 2 active][0.50 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.14][Found 963]  [Segments: 2 active][0.50 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.16][Found 976]  [Segments: 2 active][0.51 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.18][Found 993]  [Segments: 2 active][0.52 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.21][Found 1012]  [Segments: 2 active][0.53 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.22][Found 1025]  [Segments: 2 active][0.51 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.24][Found 1040]  [Segments: 2 active][0.50 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.25][Found 1048]  [Segments: 2 active][0.49 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.27][Found 1059]  [Segments: 2 active][0.49 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.29][Found 1071]  [Segments: 2 active]
+[ProgressManager] Общий прогресс: 0.00% | Активных сегментов: 2[0.48 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.31][Found 1087]  [Segments: 2 active][0.46 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.32][Found 1096]  [Segments: 2 active][0.46 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.34][Found 1108]  [Segments: 2 active][0.47 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.36][Found 1121]  [Segments: 2 active][0.47 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.37][Found 1135]  [Segments: 2 active][0.49 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.39][Found 1148]  [Segments: 2 active][0.49 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.41][Found 1165]  [Segments: 2 active][0.50 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.42][Found 1181]  [Segments: 2 active][0.51 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.44][Found 1192]  [Segments: 2 active][0.53 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.46][Found 1205]  [Segments: 2 active][0.53 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.48][Found 1223]  [Segments: 2 active][0.52 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.49][Found 1235]  [Segments: 2 active][0.54 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.51][Found 1251]  [Segments: 2 active][0.54 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.52][Found 1264]  [Segments: 2 active][0.54 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.54][Found 1277]  [Segments: 2 active]
+[ProgressManager] Общий прогресс: 0.00% | Активных сегментов: 2[0.54 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.56][Found 1302]  [Segments: 2 active][0.54 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.57][Found 1315]  [Segments: 2 active][0.54 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.59][Found 1331]  [Segments: 2 active][0.54 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.60][Found 1345]  [Segments: 2 active][0.54 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.62][Found 1353]  [Segments: 2 active][0.54 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.64][Found 1368]  [Segments: 2 active][0.55 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.65][Found 1379]  [Segments: 2 active][0.55 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.67][Found 1399]  [Segments: 2 active][0.55 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.68][Found 1413]  [Segments: 2 active][0.55 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.70][Found 1430]  [Segments: 2 active][0.55 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.71][Found 1438]  [Segments: 2 active][0.53 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.72][Found 1448]  [Segments: 2 active][0.54 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.74][Found 1468]  [Segments: 2 active][0.53 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.75][Found 1479]  [Segments: 2 active][0.53 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.76][Found 1486]  [Segments: 2 active]
+[ProgressManager] Общий прогресс: 0.00% | Активных сегментов: 2[0.53 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.78][Found 1500]  [Segments: 2 active][0.53 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.79][Found 1513]  [Segments: 2 active][0.53 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.80][Found 1526]  [Segments: 2 active][0.53 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.82][Found 1541]  [Segments: 2 active][0.56 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.83][Found 1551]  [Segments: 2 active][0.56 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.85][Found 1564]  [Segments: 2 active][0.56 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.86][Found 1582]  [Segments: 2 active][0.58 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.88][Found 1595]  [Segments: 2 active][0.59 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.89][Found 1603]  [Segments: 2 active][0.60 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.91][Found 1618]  [Segments: 2 active][0.61 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.92][Found 1628]  [Segments: 2 active][0.60 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.93][Found 1644]  [Segments: 2 active][0.60 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.95][Found 1659]  [Segments: 2 active][0.59 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.96][Found 1677]  [Segments: 2 active][0.59 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.97][Found 1695]  [Segments: 2 active]
+[ProgressManager] Общий прогресс: 0.00% | Активных сегментов: 2[0.58 Mkey/s][GPU 0.00 Mkey/s][Total 2^26.98][Found 1714]  [Segments: 2 active][0.58 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.00][Found 1732]  [Segments: 2 active][0.56 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.01][Found 1757]  [Segments: 2 active][0.56 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.02][Found 1776]  [Segments: 2 active][0.57 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.03][Found 1793]  [Segments: 2 active][0.57 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.04][Found 1815]  [Segments: 2 active][0.57 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.06][Found 1829]  [Segments: 2 active][0.57 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.07][Found 1842]  [Segments: 2 active][0.57 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.08][Found 1849]  [Segments: 2 active][0.56 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.09][Found 1856]  [Segments: 2 active][0.56 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.10][Found 1865]  [Segments: 2 active][0.55 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.11][Found 1879]  [Segments: 2 active][0.55 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.12][Found 1887]  [Segments: 2 active][0.55 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.13][Found 1898]  [Segments: 2 active][0.55 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.14][Found 1914]  [Segments: 2 active]
+[ProgressManager] Общий прогресс: 0.00% | Активных сегментов: 2[0.55 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.16][Found 1929]  [Segments: 2 active][0.55 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.17][Found 1941]  [Segments: 2 active][0.55 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.18][Found 1956]  [Segments: 2 active][0.56 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.19][Found 1968]  [Segments: 2 active][0.57 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.20][Found 1980]  [Segments: 2 active][0.58 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.21][Found 1993]  [Segments: 2 active][0.58 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.22][Found 2004]  [Segments: 2 active][0.58 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.23][Found 2021]  [Segments: 2 active][0.58 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.24][Found 2038]  [Segments: 2 active][0.59 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.25][Found 2053]  [Segments: 2 active][0.59 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.26][Found 2072]  [Segments: 2 active][0.59 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.27][Found 2083]  [Segments: 2 active][ProgressManager] Сохранение прогресса в hot2.dat...
+[ProgressManager] ✓ Прогресс сохранен успешно
+[ProgressManager]   Всего ключей проверено: 0
+[ProgressManager]   Активных сегментов: 2/2
+[ProgressManager]   Прогресс по сегментам:
+[ProgressManager]     golden_73: 0 ключей [активен]
+[ProgressManager]     golden_74: 0 ключей [активен]
+[0.58 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.28][Found 2097]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 1001472 (сегмент 0: 485376)
+[0.57 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.29][Found 2107]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 2002944 (сегмент 0: 995328)
+[ProgressManager] Всего ключей проверено: 3004416 (сегмент 0: 1486848)
+[0.57 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.30][Found 2119]  [Segments: 2 active]
+[ProgressManager] Общий прогресс: 0.00% | Активных сегментов: 2[ProgressManager] Всего ключей проверено: 4005888 (сегмент 0: 1966080)
+[0.58 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.31][Found 2132]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 5007360 (сегмент 0: 2445312)
+[0.56 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.32][Found 2143]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 6008832 (сегмент 1: 3065856)
+[0.57 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.33][Found 2158]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 7010304 (сегмент 0: 3403776)
+[0.57 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.34][Found 2175]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 8011776 (сегмент 0: 3932160)
+[0.57 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.35][Found 2186]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 9013248 (сегмент 0: 4380672)
+[ProgressManager] Всего ключей проверено: 10014720 (сегмент 0: 4909056)
+[0.57 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.36][Found 2204]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 11016192 (сегмент 0: 5419008)
+[0.58 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.37][Found 2218]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 12017664 (сегмент 1: 6100992)
+[0.58 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.38][Found 2232]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 13019136 (сегмент 0: 6475776)
+[0.59 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.39][Found 2248]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 14020608 (сегмент 1: 7084032)
+[0.59 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.40][Found 2258]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 15022080 (сегмент 1: 7606272)
+[0.57 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.41][Found 2264]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 16023552 (сегмент 0: 7901184)
+[0.57 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.42][Found 2274]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 17025024 (сегмент 1: 8613888)
+[ProgressManager] Всего ключей проверено: 18026496 (сегмент 0: 8927232)
+[0.57 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.43][Found 2284]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 19027968 (сегмент 1: 9621504)
+[0.57 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.44][Found 2309]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 20029440 (сегмент 1: 10149888)
+[0.57 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.45][Found 2324]  [Segments: 2 active]
+[ProgressManager] Общий прогресс: 0.00% | Активных сегментов: 2[ProgressManager] Всего ключей проверено: 21030912 (сегмент 1: 10684416)
+[0.56 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.46][Found 2333]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 22032384 (сегмент 0: 10868736)
+[0.56 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.47][Found 2348]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 23033856 (сегмент 0: 11347968)
+[0.56 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.48][Found 2363]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 24035328 (сегмент 0: 11857920)
+[0.58 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.48][Found 2377]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 25036800 (сегмент 0: 12349440)
+[0.56 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.49][Found 2388]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 26038272 (сегмент 1: 13185024)
+[0.53 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.50][Found 2402]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 27039744 (сегмент 0: 13357056)
+[0.52 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.51][Found 2415]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 28041216 (сегмент 1: 14155776)
+[ProgressManager] Всего ключей проверено: 29042688 (сегмент 1: 14678016)
+[0.55 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.52][Found 2435]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 30044160 (сегмент 0: 14880768)
+[0.55 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.52][Found 2449]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 31045632 (сегмент 0: 15366144)
+[0.55 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.53][Found 2466]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 32047104 (сегмент 1: 16177152)
+[0.55 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.54][Found 2488]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 33048576 (сегмент 1: 16687104)
+[0.56 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.55][Found 2505]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 34050048 (сегмент 0: 16877568)
+[0.56 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.56][Found 2515]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 35051520 (сегмент 1: 17676288)
+[ProgressManager] Всего ключей проверено: 36052992 (сегмент 0: 17879040)
+[0.59 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.57][Found 2540]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 37054464 (сегмент 1: 18671616)
+[0.59 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.58][Found 2560]  [Segments: 2 active]
+[ProgressManager] Общий прогресс: 0.00% | Активных сегментов: 2[ProgressManager] Всего ключей проверено: 38055936 (сегмент 1: 19156992)
+[0.57 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.58][Found 2573]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 39057408 (сегмент 0: 19415040)
+[0.57 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.59][Found 2584]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 40058880 (сегмент 1: 20115456)
+[0.57 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.60][Found 2601]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 41060352 (сегмент 1: 20619264)
+[0.57 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.61][Found 2615]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 42061824 (сегмент 0: 20926464)
+[ProgressManager] Всего ключей проверено: 43063296 (сегмент 0: 21454848)
+[0.57 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.62][Found 2633]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 44064768 (сегмент 0: 21952512)
+[0.58 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.63][Found 2649]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 45066240 (сегмент 1: 22634496)
+[0.58 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.63][Found 2668]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 46067712 (сегмент 0: 22966272)
+[0.57 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.64][Found 2680]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 47069184 (сегмент 0: 23470080)
+[0.58 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.65][Found 2699]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 48070656 (сегмент 0: 23918592)
+[0.56 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.66][Found 2710]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 49072128 (сегмент 0: 24422400)
+[0.54 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.66][Found 2720]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 50073600 (сегмент 0: 24913920)
+[0.52 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.67][Found 2733]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 51075072 (сегмент 1: 25669632)
+[0.50 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.67][Found 2741]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 52076544 (сегмент 1: 26179584)
+[0.49 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.68][Found 2752]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 53078016 (сегмент 1: 26701824)
+[0.49 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.69][Found 2774]  [Segments: 2 active]
+[ProgressManager] Общий прогресс: 0.00% | Активных сегментов: 2[ProgressManager] Всего ключей проверено: 54079488 (сегмент 1: 27199488)
+[0.50 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.70][Found 2797]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 55080960 (сегмент 0: 27389952)
+[0.48 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.70][Found 2803]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 56082432 (сегмент 0: 27930624)
+[0.49 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.71][Found 2811]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 57083904 (сегмент 0: 28434432)
+[0.50 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.71][Found 2824]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 58085376 (сегмент 1: 29147136)
+[0.50 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.72][Found 2837]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 59086848 (сегмент 1: 29644800)
+[0.51 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.73][Found 2855]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 60088320 (сегмент 0: 29927424)
+[0.50 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.73][Found 2873]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 61089792 (сегмент 0: 30418944)
+[0.50 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.74][Found 2895]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 62091264 (сегмент 1: 31193088)
+[0.51 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.75][Found 2910]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 63092736 (сегмент 0: 31414272)
+[0.51 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.75][Found 2922]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 64094208 (сегмент 0: 31924224)
+[0.52 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.76][Found 2938]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 65095680 (сегмент 1: 32612352)
+[0.54 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.77][Found 2953]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 66097152 (сегмент 1: 33122304)
+[ProgressManager] Всего ключей проверено: 67098624 (сегмент 0: 33521664)
+[0.55 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.78][Found 2969]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 68100096 (сегмент 1: 34111488)
+[0.55 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.78][Found 2985]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 69101568 (сегмент 1: 34639872)
+[0.56 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.79][Found 2996]  [Segments: 2 active]
+[ProgressManager] Общий прогресс: 0.00% | Активных сегментов: 2[ProgressManager] Всего ключей проверено: 70103040 (сегмент 0: 34947072)
+[0.55 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.80][Found 3001]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 71104512 (сегмент 0: 35463168)
+[0.53 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.80][Found 3016]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 72105984 (сегмент 1: 36145152)
+[0.53 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.81][Found 3026]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 73107456 (сегмент 0: 36470784)
+[0.52 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.81][Found 3034]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 74108928 (сегмент 1: 37140480)
+[0.51 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.82][Found 3049]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 75110400 (сегмент 1: 37644288)
+[0.50 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.83][Found 3064]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 76111872 (сегмент 1: 38154240)
+[0.49 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.83][Found 3082]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 77113344 (сегмент 0: 38461440)
+[0.49 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.84][Found 3101]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 78114816 (сегмент 0: 38952960)
+[0.49 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.84][Found 3114]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 79116288 (сегмент 1: 39647232)
+[0.48 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.85][Found 3123]  [Segments: 2 active][0.46 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.85][Found 3131]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 80117760 (сегмент 1: 40126464)
+[0.47 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.86][Found 3145]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 81119232 (сегмент 0: 40495104)
+[0.48 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.87][Found 3156]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 82120704 (сегмент 1: 41091072)
+[0.49 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.87][Found 3171]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 83122176 (сегмент 0: 41564160)
+[ProgressManager] Всего ключей проверено: 84123648 (сегмент 1: 42055680)
+[0.49 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.88][Found 3186]  [Segments: 2 active]
+[ProgressManager] Общий прогресс: 0.00% | Активных сегментов: 2[ProgressManager] Всего ключей проверено: 85125120 (сегмент 0: 42522624)
+[0.49 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.89][Found 3196]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 86126592 (сегмент 1: 43081728)
+[0.49 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.89][Found 3208]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 87128064 (сегмент 0: 43542528)
+[0.50 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.90][Found 3217]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 88129536 (сегмент 0: 44046336)
+[0.53 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.90][Found 3231]  [Segments: 2 active][0.51 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.91][Found 3242]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 89131008 (сегмент 1: 44537856)
+[ProgressManager] Всего ключей проверено: 90132480 (сегмент 1: 45041664)
+[0.51 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.91][Found 3254]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 91133952 (сегмент 0: 45606912)
+[0.52 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.92][Found 3273]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 92135424 (сегмент 1: 46024704)
+[0.52 Mkey/s][GPU 0.00 Mkey/s][Total 2^27.93][Found 3294]  [Segments: 2 active][ProgressManager] Всего ключей проверено: 93136896 (сегмент 0: 46639104)

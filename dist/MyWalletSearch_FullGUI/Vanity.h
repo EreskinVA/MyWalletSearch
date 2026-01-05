@@ -1,0 +1,239 @@
+/*
+ * This file is part of the VanitySearch distribution (https://github.com/JeanLucPons/VanitySearch).
+ * Copyright (c) 2019 Jean Luc PONS.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+*/
+
+#ifndef VANITYH
+#define VANITYH
+
+#include <string>
+#include <vector>
+#include <unordered_set>
+#include "SECP256k1.h"
+#include "GPU/GPUEngine.h"
+#include "SegmentSearch.h"
+#include "BloomFilter.h"
+#ifdef WIN64
+#include <Windows.h>
+#endif
+
+#define CPU_GRP_SIZE 1024
+
+class VanitySearch;
+
+typedef struct {
+
+  VanitySearch *obj;
+  int  threadId;
+  bool isRunning;
+  bool hasStarted;
+  bool rekeyRequest;
+  int  gridSizeX;
+  int  gridSizeY;
+  int  gpuId;
+
+} TH_PARAM;
+
+
+// Позиционная маска: фиксированные символы в определенных позициях
+typedef struct {
+  int position;      // Позиция в адресе (0-based)
+  char character;    // Фиксированный символ в этой позиции
+} POSITIONAL_MASK_ITEM;
+
+typedef struct {
+  std::vector<POSITIONAL_MASK_ITEM> fixedPositions;  // Список фиксированных позиций
+  bool isValid;                                      // Валидна ли маска
+  int totalLength;                                    // Общая длина паттерна
+} POSITIONAL_MASK;
+
+typedef struct {
+
+  char *prefix;
+  int prefixLength;
+  char *suffix;
+  int suffixLength;
+  prefix_t sPrefix;
+  double difficulty;
+  bool *found;
+
+  // For dreamer ;)
+  bool isFull;
+  prefixl_t lPrefix;
+  uint8_t hash160[20];
+
+} PREFIX_ITEM;
+
+typedef struct {
+
+  std::vector<PREFIX_ITEM> *items;
+  bool found;
+
+} PREFIX_TABLE_ITEM;
+
+class VanitySearch {
+
+public:
+
+  VanitySearch(Secp256K1 *secp, std::vector<std::string> &prefix, std::string seed, int searchMode,
+               bool useGpu,bool stop,std::string outputFile, bool useSSE,uint32_t maxFound,uint64_t rekey,
+               bool caseSensitive,Point &startPubKey,bool paranoiacSeed,
+               bool useSegments=false,std::string segmentFile="",int bitRange=0,
+               std::string progressFile="",bool resumeProgress=false,int autoSaveInterval=300,
+               bool useKangaroo=false,std::string databasePath="");
+
+  void Search(int nbThread,std::vector<int> gpuId,std::vector<int> gridSize);
+  void FindKeyCPU(TH_PARAM *p);
+  void FindKeyGPU(TH_PARAM *p);
+
+private:
+
+  std::string GetHex(std::vector<unsigned char> &buffer);
+  std::string GetExpectedTime(double keyRate, double keyCount);
+  bool checkPrivKey(std::string addr, Int &key, int32_t incr, int endomorphism, bool mode);
+  void checkAddr(int prefIdx, uint8_t *hash160, Int &key, int32_t incr, int endomorphism, bool mode);
+  void checkAddrSSE(uint8_t *h1, uint8_t *h2, uint8_t *h3, uint8_t *h4,
+                    int32_t incr1, int32_t incr2, int32_t incr3, int32_t incr4,
+                    Int &key, int endomorphism, bool mode);
+  void checkAddresses(bool compressed, Int key, int i, Point p1);
+  void checkAddressesSSE(bool compressed, Int key, int i, Point p1, Point p2, Point p3, Point p4);
+  void output(std::string addr, std::string pAddr, std::string pAddrHex);
+  // Доп. информация для SegmentSearch: "сырой" скаляр внутри заданного сегмента (до endo/sym преобразований)
+  void output(std::string addr, std::string pAddr, std::string pAddrHex,
+              std::string segKeyHex, std::string segKeyDec, std::string puzzleInfo, std::string segExtraInfo);
+  bool isAlive(TH_PARAM *p);
+  bool isSingularPrefix(std::string pref);
+  bool hasStarted(TH_PARAM *p);
+  void rekeyRequest(TH_PARAM *p);
+  uint64_t getGPUCount();
+  uint64_t getCPUCount();
+  bool initPrefix(std::string &prefix, PREFIX_ITEM *it);
+  bool initPrefixSuffix(std::string &prefix, std::string &suffix, PREFIX_ITEM *it);
+  void dumpPrefixes();
+  double getDiffuclty();
+  void updateFound();
+  void getCPUStartingKey(int thId, Int& key, Point& startP);
+  void getGPUStartingKeys(int thId, int groupSize, int nbThread, Int *keys, Point *p);
+  void enumCaseUnsentivePrefix(std::string s, std::vector<std::string> &list);
+  bool prefixMatch(char *prefix, char *addr);
+  bool prefixSuffixMatch(char *prefix, int prefixLen, char *suffix, int suffixLen, char *addr);
+  
+  // Позиционные маски: парсинг и проверка
+  POSITIONAL_MASK parsePositionalMask(const std::string &pattern);
+  bool checkPositionalMask(const std::string &addr, const POSITIONAL_MASK &mask);
+
+  Secp256K1 *secp;
+  Int startKey;
+  Point startPubKey;
+  bool startPubKeySpecified;
+  uint64_t counters[256];
+  double startTime;
+  int searchType;
+  int searchMode;
+  bool hasPattern;
+  bool caseSensitive;
+  bool useGpu;
+  bool stopWhenFound;
+  bool endOfSearch;
+  int nbCPUThread;
+  int nbGPUThread;
+  int nbFoundKey;
+  uint64_t rekey;
+  uint64_t lastRekey;
+  uint32_t nbPrefix;
+  std::string outputFile;
+  bool useSSE;
+  bool onlyFull;
+  uint32_t maxFound;
+  double _difficulty;
+  bool *patternFound;
+  std::vector<PREFIX_TABLE_ITEM> prefixes;
+  std::vector<prefix_t> usedPrefix;
+  std::vector<LPREFIX> usedPrefixL;
+  std::vector<std::string> &inputPrefixes;
+  
+  // Позиционные маски для каждого паттерна
+  std::vector<POSITIONAL_MASK> positionalMasks;
+
+  // GPU wildcard filter pattern:
+  // GPUEngine currently supports only ONE wildcard pattern on GPU.
+  // When user provides many patterns (-i), we choose a "superset" filter for GPU (e.g. commonPrefix + "*"),
+  // and still validate all patterns on CPU for each GPU candidate.
+  std::string gpuPattern;
+
+  Int beta;
+  Int lambda;
+  Int beta2;
+  Int lambda2;
+
+  // Segment search support
+  bool useSegmentSearch;
+  SegmentSearch *segmentSearch;
+  int segmentBitRange;
+  
+  // Deduplication: track already written addresses to prevent duplicates
+  std::unordered_set<std::string> foundAddresses;
+
+  // Database integration for checking generated addresses
+  std::string databasePath;
+  void *databaseHandle;  // sqlite3* handle (void* to avoid including sqlite3.h)
+  bool databaseEnabled;
+  bool databaseLoaded;
+  int nbFoundInDatabase;
+  std::string databaseOutputFile;
+  
+  // Binary hash160 key for ultra-fast comparisons (avoids Base58 encoding)
+  struct Hash160Key {
+    uint8_t data[20];
+    
+    bool operator==(const Hash160Key& other) const {
+      return memcmp(data, other.data, 20) == 0;
+    }
+  };
+  
+  // Hash function for Hash160Key
+  struct Hash160KeyHasher {
+    size_t operator()(const Hash160Key& key) const {
+      // Use first 8 bytes as hash (fast and good distribution)
+      return *((uint64_t*)key.data);
+    }
+  };
+  
+  // In-memory hash table for ultra-fast lookups
+  // OPTIMIZATION: Store binary hash160 instead of Base58 strings (10x faster!)
+  std::unordered_set<Hash160Key, Hash160KeyHasher> databaseHash160Set;
+  bool useInMemoryDatabase;  // Flag to enable in-memory mode
+  bool useBinaryHash;        // Flag to use binary hash160 (much faster!)
+  
+  // OPTIMIZATION: Bloom Filter for ultra-fast negative checks (100x faster!)
+  // Avoids cache misses by keeping small filter in L3 cache
+  BloomFilter* bloomFilter;
+  bool useBloomFilter;       // Flag to enable Bloom Filter (recommended!)
+  
+  bool initDatabase();
+  void closeDatabase();
+  bool checkAddressInDatabase(const std::string &addr);
+  bool checkHash160InDatabase(const uint8_t *hash160);  // OPTIMIZATION: Binary hash check
+  bool saveDatabaseMatch(const std::string &addr, Int &key, int32_t incr, int endomorphism, bool mode);
+
+#ifdef WIN64
+  HANDLE ghMutex;
+#else
+  pthread_mutex_t  ghMutex;
+#endif
+
+};
+
+#endif // VANITYH
