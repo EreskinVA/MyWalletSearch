@@ -2370,6 +2370,13 @@ void VanitySearch::FindKeyCPU(TH_PARAM *ph) {
     
     if (useSeg && segSearch != NULL) {
       segSearch->UpdateProgress(thId, 6*CPU_GRP_SIZE);
+      
+      // ✅ Проверяем, есть ли ещё активные сегменты
+      // Load Balancer автоматически переназначит потоки при ребалансировке
+      // Здесь мы просто проверяем, не завершены ли ВСЕ сегменты
+      if (segSearch->IsSearchComplete()) {
+        endOfSearch = true;
+      }
     }
 
   }
@@ -2653,8 +2660,8 @@ void VanitySearch::Search(int nbThread,std::vector<int> gpuId,std::vector<int> g
   // ✅ ВКЛЮЧАЕМ LOAD BALANCER для сегментного поиска (если включен)
   if (useSegmentSearch && segmentSearch != NULL) {
     int totalThreads = nbCPUThread + nbGPUThread;
-    segmentSearch->EnableLoadBalancing(totalThreads, 60); // Ребалансировка каждые 60 секунд
-    printf("[VanitySearch] ✓ Load Balancer включён: %d потоков, ребалансировка каждые 60 сек\n", totalThreads);
+    segmentSearch->EnableLoadBalancing(totalThreads, 5); // Ребалансировка каждые 5 секунд для быстрого переключения
+    printf("[VanitySearch] ✓ Load Balancer включён: %d потоков, ребалансировка каждые 5 сек\n", totalThreads);
   }
 
   TH_PARAM *params = (TH_PARAM *)malloc((nbCPUThread + nbGPUThread) * sizeof(TH_PARAM));

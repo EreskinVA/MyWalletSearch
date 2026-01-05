@@ -951,6 +951,7 @@ class VanityUnifiedGUI:
         grid = self.grid.get().strip() or ("64,128" if not _is_windows() else self.grid.get().strip() or "64,128")
 
         self.log(f"[START] groups={len(groups)} backend={'GPU' if is_gpu else 'CPU'} workdir={self.workdir()}\n")
+        self.log(f"[START] ℹ️  Load Balancer: Автоматически включён для равномерного распределения {t} потоков по сегментам\n")
         multi = len(groups) > 1
 
         started = 0
@@ -1384,6 +1385,10 @@ def cli_main() -> int:
         autosave = prompt("autosave (sec)", autosave)
         maxfound = prompt("maxFound (-m)", maxfound)
         backend = prompt("backend (cpu/gpu)", backend)
+        
+        # ✅ Database support in CLI mode
+        database = prompt("Database path (leave empty to skip)", "")
+        
         pattern = prompt("pattern (single)", pattern)
 
         df = df_for(base)
@@ -1403,6 +1408,16 @@ def cli_main() -> int:
             gpuid = prompt("gpuId", "0")
             grid = prompt("grid (-g)", "64,128")
             args.extend(["-gpu", "-gpuId", gpuid, "-g", grid])
+        
+        # Add database if provided
+        if database.strip():
+            db_file = Path(database.strip())
+            if db_file.exists():
+                args.extend(["-db", str(db_file)])
+                print(f"[START] 📁 Database: {db_file}")
+            else:
+                print(f"[START] ⚠️  Database not found: {database}, continuing without database")
+        
         args.extend(
             [
                 "-t",
@@ -1429,6 +1444,7 @@ def cli_main() -> int:
             p = subprocess.Popen(args, **kwargs)  # type: ignore[arg-type]
             df.pid_file.write_text(str(p.pid), encoding="utf-8")
             print(f"[START] PID={p.pid}")
+            print(f"[START] ℹ️  Load Balancer: Автоматически включён для {threads} потоков")
             print(f"[CMD] {_format_cmd_for_display(args)}")
         except Exception as e:
             logf.close()
