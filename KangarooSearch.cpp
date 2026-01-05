@@ -195,7 +195,9 @@ std::string KangarooSearch::ComputeDistinguishedHash(const Point &p) {
   
   char hex[65];
   for (int i = 0; i < 32; i++) {
-    sprintf(hex + i*2, "%02x", hash[i]);
+    // macOS/clang: sprintf помечен deprecated. Нам нужно строго 2 символа + '\0'.
+    // Пишем в окно длиной 3 байта (2 hex + terminator).
+    snprintf(hex + i * 2, 3, "%02x", hash[i]);
   }
   
   return std::string(hex);

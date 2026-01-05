@@ -890,7 +890,7 @@ string VanitySearch::GetExpectedTime(double keyRate,double keyCount) {
   // pow(1-P,keyCount) is the probality of failure after keyCount tries
   double cP = 1.0 - pow(1-P,keyCount);
 
-  sprintf(tmp,"[Prob %.1f%%]",cP*100.0);
+  snprintf(tmp, sizeof(tmp), "[Prob %.1f%%]", cP * 100.0);
   ret = string(tmp);
 
   double desiredP = 0.5;
@@ -912,11 +912,11 @@ string VanitySearch::GetExpectedTime(double keyRate,double keyCount) {
     double nbYear = nbDay/365.0;
     if (nbYear > 1) {
       if(nbYear<5)
-        sprintf(tmp, "[%.f%% in %.1fy]", desiredP*100.0, nbYear);
+        snprintf(tmp, sizeof(tmp), "[%.f%% in %.1fy]", desiredP * 100.0, nbYear);
       else
-        sprintf(tmp, "[%.f%% in %gy]", desiredP*100.0, nbYear);
+        snprintf(tmp, sizeof(tmp), "[%.f%% in %gy]", desiredP * 100.0, nbYear);
     } else {
-      sprintf(tmp, "[%.f%% in %.1fd]", desiredP*100.0, nbDay);
+      snprintf(tmp, sizeof(tmp), "[%.f%% in %.1fd]", desiredP * 100.0, nbDay);
     }
 
   } else {
@@ -926,7 +926,7 @@ string VanitySearch::GetExpectedTime(double keyRate,double keyCount) {
     int nbMin = (int)(((iTime % 86400) % 3600) / 60);
     int nbSec = (int)(iTime % 60);
 
-    sprintf(tmp, "[%.f%% in %02d:%02d:%02d]", desiredP*100.0, nbHour, nbMin, nbSec);
+    snprintf(tmp, sizeof(tmp), "[%.f%% in %02d:%02d:%02d]", desiredP * 100.0, nbHour, nbMin, nbSec);
 
   }
 
@@ -2560,7 +2560,7 @@ string VanitySearch::GetHex(vector<unsigned char> &buffer) {
 
   char tmp[128];
   for (int i = 0; i < (int)buffer.size(); i++) {
-    sprintf(tmp,"%02X",buffer[i]);
+    snprintf(tmp, sizeof(tmp), "%02X", buffer[i]);
     ret.append(tmp);
   }
 

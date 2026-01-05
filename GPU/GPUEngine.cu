@@ -167,7 +167,7 @@ std::string toHex(unsigned char *data, int length) {
   char tmp[3];
   for (int i = 0; i < length; i++) {
     if (i && i % 4 == 0) ret.append(" ");
-    sprintf(tmp, "%02x", (int)data[i]);
+    snprintf(tmp, sizeof(tmp), "%02x", (int)data[i]);
     ret.append(tmp);
   }
   return ret;
@@ -281,7 +281,7 @@ GPUEngine::GPUEngine(int nbThreadGroup, int nbThreadPerGroup, int gpuId, uint32_
   outputPrefixPinnedCuda = false;
 
   char tmp[512];
-  sprintf(tmp,"GPU #%d %s (%dx%d cores) Grid(%dx%d)",
+  snprintf(tmp, sizeof(tmp), "GPU #%d %s (%dx%d cores) Grid(%dx%d)",
   gpuId,deviceProp.name,deviceProp.multiProcessorCount,
   _ConvertSMVer2Cores(deviceProp.major, deviceProp.minor),
                       nbThread / nbThreadPerGroup,
@@ -340,7 +340,7 @@ GPUEngine::GPUEngine(int nbThreadGroup, int nbThreadPerGroup, int gpuId, uint32_
       this->nbThread = curGroups * nbThreadPerGroup;
       // Update deviceName to reflect new grid (helps debugging)
       char tmp2[512];
-      sprintf(tmp2,"GPU #%d %s (%dx%d cores) Grid(%dx%d)",
+      snprintf(tmp2, sizeof(tmp2), "GPU #%d %s (%dx%d cores) Grid(%dx%d)",
               gpuId,deviceProp.name,deviceProp.multiProcessorCount,
               _ConvertSMVer2Cores(deviceProp.major, deviceProp.minor),
               nbThread / nbThreadPerGroup,

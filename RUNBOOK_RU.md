@@ -244,22 +244,26 @@ Set-Location "C:\path\to\MyWalletSearch\x64\ReleaseSM61"
 Get-Process VanitySearch -ErrorAction SilentlyContinue | Stop-Process -Force
 ```
 
-### 0.10 (Опционально) GUI-лаунчер для Windows
+### 0.10 (Опционально) GUI-лаунчер (единый: Windows/macOS, CPU/GPU)
 
-В репозитории есть мини-приложение `vanity_gui.py` (tkinter, без зависимостей), которое умеет:
+В репозитории есть мини-приложение `vanity_gui_unified.py` (tkinter, без зависимостей), которое умеет:
 - генерировать seg-файл из многострочного поля
-- запускать `VanitySearch.exe` с `-progress/-autosave` (и `-resume`, если progress уже существует)
+- запускать `VanitySearch` (Windows/macOS) в CPU/GPU режимах с `-progress/-autosave` (и `-resume`, если progress уже существует)
 - писать лог/прогресс/найденные в файлы с суффиксами от одного базового имени
 - показывать tail последних N строк лога и вывод `show_segment_progress.py`
-- останавливать все процессы `VanitySearch.exe`
-- пересобирать `VanitySearch` под текущий GPU (через MSBuild)
+- останавливать процессы (Windows: taskkill, macOS: kill/pkill)
+- пересобирать `VanitySearch` (Windows: MSBuild, macOS: make)
 
-Запуск:
+Запуск (рекомендуется):
 
 ```powershell
 cd C:\path\to\MyWalletSearch
-python .\vanity_gui.py
+python .\vanity_gui_unified.py
 ```
+
+Для совместимости старые entrypoints тоже работают (они просто перенаправляют на unified):
+- `vanity_gui.py`
+- `vanity_gui_cpu_macos.py`
 
 Файлы создаются в `runs\` с именованием как в `run_puzzle71_69_72.sh`:
 - `seg_<base>.txt`
