@@ -23,6 +23,7 @@ SegmentSearch::SegmentSearch() {
   keysCheckedSinceLastSave = 0;
   loadBalancer = NULL;
   loadBalancingEnabled = false;
+  loadBalancerNumThreads = 0;
   searchAlgorithm = ALGORITHM_STANDARD;  // По умолчанию стандартный
   kangarooSearch = NULL;
 #ifndef WIN64
@@ -514,8 +515,10 @@ int SegmentSearch::GetSegmentForThread(int threadId) {
     return -1;
   }
   
-  // Использовать балансировщик, если включен
-  if (loadBalancingEnabled && loadBalancer != NULL) {
+  // Использовать балансировщик только для "реальных" потоков (0..numThreads-1).
+  // GPU globalThreadId может быть огромным и должен распределяться без LoadBalancer.
+  if (loadBalancingEnabled && loadBalancer != NULL &&
+      threadId >= 0 && threadId < loadBalancerNumThreads) {
     int seg = loadBalancer->GetSegmentForThread(threadId);
 #ifndef WIN64
     pthread_mutex_unlock(&mutex);
@@ -537,7 +540,10 @@ int SegmentSearch::GetSegmentForThread(int threadId) {
     for (int k = 0; k < w; k++) weighted.push_back((int)i);
   }
   if (!weighted.empty()) {
-    int idx = weighted[(size_t)threadId % weighted.size()];
+    // threadId может быть отрицательным (например, из-за overflow в GPU globalThreadId).
+    // Используем безопасный модуль через unsigned, чтобы корректно распределять.
+    uint64_t tidu = (threadId < 0) ? (uint64_t)(-(int64_t)threadId) : (uint64_t)threadId;
+    int idx = weighted[(size_t)(tidu % (uint64_t)weighted.size())];
 #ifndef WIN64
     pthread_mutex_unlock(&mutex);
 #else
@@ -571,17 +577,21 @@ bool SegmentSearch::GetStartingKey(int threadId, Int &key) {
     return false;
   }
   
-  // Использовать балансировщик, если включен
-  if (loadBalancingEnabled && loadBalancer != NULL) {
+  // Использовать балансировщик только для "реальных" потоков (0..numThreads-1).
+  // GPU globalThreadId может быть огромным и должен распределяться без LoadBalancer.
+  if (loadBalancingEnabled && loadBalancer != NULL &&
+      threadId >= 0 && threadId < loadBalancerNumThreads) {
     segIdx = loadBalancer->GetSegmentForThread(threadId);
   } else {
     // Простое распределение: round-robin по активным сегментам
     int activeCount = 0;
     int activeSegCount = activeSegments;
+    uint64_t tidu = (threadId < 0) ? (uint64_t)(-(int64_t)threadId) : (uint64_t)threadId;
+    int want = (activeSegCount > 0) ? (int)(tidu % (uint64_t)activeSegCount) : 0;
     for (size_t i = 0; i < segments.size(); i++) {
       if (segments[i].active) {
-        if (activeCount == (threadId % activeSegCount)) {
-          segIdx = i;
+        if (activeCount == want) {
+          segIdx = (int)i;
           break;
         }
         activeCount++;
@@ -675,17 +685,21 @@ bool SegmentSearch::GetNextKey(int threadId, Int &key) {
     return false;
   }
   
-  // Использовать балансировщик, если включен
-  if (loadBalancingEnabled && loadBalancer != NULL) {
+  // Использовать балансировщик только для "реальных" потоков (0..numThreads-1).
+  // GPU globalThreadId может быть огромным и должен распределяться без LoadBalancer.
+  if (loadBalancingEnabled && loadBalancer != NULL &&
+      threadId >= 0 && threadId < loadBalancerNumThreads) {
     segIdx = loadBalancer->GetSegmentForThread(threadId);
   } else {
     // Простое распределение: round-robin по активным сегментам
     int activeCount = 0;
     int activeSegCount = activeSegments;
+    uint64_t tidu = (threadId < 0) ? (uint64_t)(-(int64_t)threadId) : (uint64_t)threadId;
+    int want = (activeSegCount > 0) ? (int)(tidu % (uint64_t)activeSegCount) : 0;
     for (size_t i = 0; i < segments.size(); i++) {
       if (segments[i].active) {
-        if (activeCount == (threadId % activeSegCount)) {
-          segIdx = i;
+        if (activeCount == want) {
+          segIdx = (int)i;
           break;
         }
         activeCount++;
@@ -779,7 +793,7 @@ void SegmentSearch::PrintSegments() {
   WaitForSingleObject(mutex, INFINITE);
 #endif
   
-  int segCount = segments.size();
+  size_t segCount = segments.size();
   int activeCount = activeSegments;
   int bitR = bitRange;
   
@@ -820,7 +834,7 @@ void SegmentSearch::PrintSegments() {
 #endif
   
   printf("\n=== Конфигурация сегментов поиска ===\n");
-  printf("Всего сегментов: %d\n", segCount);
+  printf("Всего сегментов: %zu\n", segCount);
   printf("Активных сегментов: %d\n", activeCount);
   printf("Битовый диапазон: %d\n\n", bitR);
   
@@ -1115,16 +1129,19 @@ void SegmentSearch::UpdateProgress(int threadId, uint64_t keysChecked) {
   // Если не нашли сохранённый сегмент, распределяем заново
   if (segIdx < 0 && !segments.empty()) {
     // Использовать балансировщик, если включен
-    if (loadBalancingEnabled && loadBalancer != NULL) {
+    if (loadBalancingEnabled && loadBalancer != NULL &&
+        threadId >= 0 && threadId < loadBalancerNumThreads) {
       segIdx = loadBalancer->GetSegmentForThread(threadId);
     } else {
       // Простое распределение: round-robin по активным сегментам
       int activeCount = 0;
       int activeSegCount = activeSegments;
+      uint64_t tidu = (threadId < 0) ? (uint64_t)(-(int64_t)threadId) : (uint64_t)threadId;
+      int want = (activeSegCount > 0) ? (int)(tidu % (uint64_t)activeSegCount) : 0;
       for (size_t i = 0; i < segments.size(); i++) {
         if (segments[i].active) {
-          if (activeCount == (threadId % activeSegCount)) {
-            segIdx = i;
+          if (activeCount == want) {
+            segIdx = (int)i;
             break;
           }
           activeCount++;
@@ -1253,7 +1270,8 @@ void SegmentSearch::UpdateProgressGPU(int baseThreadId, int nbThread, uint64_t k
     // round-robin по активным сегментам
     int activeSegCount = activeSegments;
     if (activeSegCount <= 0) return 0;
-    int want = threadId % activeSegCount;
+    uint64_t tidu = (threadId < 0) ? (uint64_t)(-(int64_t)threadId) : (uint64_t)threadId;
+    int want = (int)(tidu % (uint64_t)activeSegCount);
     int activeCount = 0;
     for (size_t i = 0; i < segments.size(); i++) {
       if (!segments[i].active) continue;
@@ -1485,10 +1503,11 @@ void SegmentSearch::EnableLoadBalancing(int numThreads, int rebalanceInterval) {
     loadBalancer = new LoadBalancer();
   }
   
-  loadBalancer->Initialize(segments.size(), numThreads);
+  loadBalancer->Initialize((int)segments.size(), numThreads);
   loadBalancer->SetRebalanceInterval(rebalanceInterval);
   loadBalancer->EnableAdaptiveBalancing(true);
   loadBalancingEnabled = true;
+  loadBalancerNumThreads = numThreads;
   
   printf("[SegmentSearch] Балансировка нагрузки включена\n");
 }
@@ -1516,7 +1535,7 @@ bool SegmentSearch::PerformRebalance() {
   // Обновить статус завершённых сегментов
   for (size_t i = 0; i < segments.size(); i++) {
     if (!segments[i].active) {
-      loadBalancer->MarkSegmentCompleted(i);
+      loadBalancer->MarkSegmentCompleted((int)i);
     }
   }
   

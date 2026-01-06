@@ -388,7 +388,7 @@ void KangarooSearch::PrintStatistics() const {
   printf("=== Статистика Pollard's Kangaroo ===\n");
   printf("Всего прыжков:      %llu\n", (unsigned long long)totalJumps);
   printf("Distinguished pts:  %llu\n", (unsigned long long)distinguishedPointsFound);
-  printf("Время работы:       %ld сек\n", elapsed);
+  printf("Время работы:       %lld сек\n", (long long)elapsed);
   
   if (elapsed > 0) {
     double mkeysPerSec = (totalJumps / 1000000.0) / elapsed;
@@ -564,7 +564,7 @@ bool KangarooSearch::LoadState(const std::string &filename) {
   printf("[Kangaroo] ✓ Состояние загружено\n");
   printf("[Kangaroo]   Tame кенгуру: %d\n", tameCount);
   printf("[Kangaroo]   Wild кенгуру: %d\n", wildCount);
-  printf("[Kangaroo]   Distinguished points: %lu\n", distinguishedPoints.size());
+  printf("[Kangaroo]   Distinguished points: %zu\n", (size_t)distinguishedPoints.size());
   printf("[Kangaroo]   Всего прыжков: %llu\n", (unsigned long long)totalJumps);
   
   return true;

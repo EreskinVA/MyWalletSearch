@@ -138,6 +138,11 @@ private:
   // Load balancing
   LoadBalancer *loadBalancer;
   bool loadBalancingEnabled;
+  // LoadBalancer рассчитан на "реальные" потоки (0..numThreads-1).
+  // В GPU-режиме threadId может быть очень большим (globalThreadId = thId*nbThread + i),
+  // и такие id НЕ должны идти через LoadBalancer, иначе все "неизвестные" потоки
+  // могут прилипнуть к первому сегменту.
+  int loadBalancerNumThreads;
   
   // Search algorithm
   SearchAlgorithm searchAlgorithm;

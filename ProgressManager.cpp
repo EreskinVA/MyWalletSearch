@@ -365,19 +365,22 @@ std::string ProgressManager::FormatTime(time_t t) {
 std::string ProgressManager::FormatDuration(time_t seconds) {
   char buffer[100];
   
-  int days = seconds / 86400;
-  int hours = (seconds % 86400) / 3600;
-  int mins = (seconds % 3600) / 60;
-  int secs = seconds % 60;
+  // time_t может быть 64-битным на Windows; используем 64-битную арифметику,
+  // чтобы не ловить предупреждения и возможную потерю данных.
+  long long s = (long long)seconds;
+  long long days = s / 86400LL;
+  long long hours = (s % 86400LL) / 3600LL;
+  long long mins = (s % 3600LL) / 60LL;
+  long long secs = s % 60LL;
   
   if (days > 0) {
-    snprintf(buffer, sizeof(buffer), "%d дн %d ч %d мин", days, hours, mins);
+    snprintf(buffer, sizeof(buffer), "%lld дн %lld ч %lld мин", days, hours, mins);
   } else if (hours > 0) {
-    snprintf(buffer, sizeof(buffer), "%d ч %d мин %d сек", hours, mins, secs);
+    snprintf(buffer, sizeof(buffer), "%lld ч %lld мин %lld сек", hours, mins, secs);
   } else if (mins > 0) {
-    snprintf(buffer, sizeof(buffer), "%d мин %d сек", mins, secs);
+    snprintf(buffer, sizeof(buffer), "%lld мин %lld сек", mins, secs);
   } else {
-    snprintf(buffer, sizeof(buffer), "%d сек", secs);
+    snprintf(buffer, sizeof(buffer), "%lld сек", secs);
   }
   
   return std::string(buffer);
